@@ -32,18 +32,21 @@ def write_tokens_streaming(split_name, out_path, max_tokens):
                 continue
                 
             buffer.extend(ids + [tokenizer.eos_token_id])
-            if len(buffer) >= 1_000_000:
+            while len(buffer) >= 1_000_000:
                 # write at once
                 arr = np.array(buffer[:1_000_000], dtype=np.uint16)
                 f.write(arr.tobytes())
-                total += len(buffer)
+                total += len(arr)
                 buffer = buffer[1_000_000:]
                 
                 print(f"{split_name}: wrote {total}/{max_tokens}", end='\r')
                 
                 if total >= max_tokens:
                     break
-    
+            
+            if total >= max_tokens:
+                break
+            
     print(f"\nDone {split_name}. Wrote {total} tokens to {out_path}")
     
 if __name__ == '__main__':
