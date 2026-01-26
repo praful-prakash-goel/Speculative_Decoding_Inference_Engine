@@ -15,6 +15,7 @@ class ModelConfig:
         vocab_size: Number of distinct characters in the database
         dropout: Dropout ratio
     '''
+    
     n_heads: int
     n_layers: int
     n_embd: int
