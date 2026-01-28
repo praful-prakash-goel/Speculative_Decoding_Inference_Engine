@@ -60,7 +60,7 @@ def train_model():
         return
         
     model = build_model(device=device, config=model_config)
-    print(f">> {model_name.lower()} model: {sum(p.numel() for p in model.parameters())/1e6}M Parameters")
+    print(f">> Training {model_name.lower()} model: {sum(p.numel() for p in model.parameters())/1e6}M Parameters")
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     
