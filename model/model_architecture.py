@@ -139,11 +139,40 @@ class SelfAttention(nn.Module):
         self.value = nn.Linear(config.n_embd, n_kv_heads * head_dim, bias=False)
         self.proj = nn.Linear(config.n_embd, config.n_embd, bias=False)
         self.rope = RotaryEmbedding(dim=head_dim, max_seq_len=config.context_length)
+        
+        self.k_cache = None
+        self.v_cache = None
+        self.curr_len = 0
+        
+    def reset_cache(self):
+        self.k_cache = None
+        self.v_cache = None
+        self.curr_len = 0
     
-    def forward(self, x):
+    def append_cache(self, T, new_k, new_v):
+        '''
+        Args:
+            T: Sequence length (T == 1 -> during incremental decoding AND T >= 1 -> during prefill and verification)
+            new_k: New key vector
+            new_v: New value vector
+        '''
+        self.k_cache[:, :, self.curr_len : self.curr_len + T] = new_k
+        self.v_cache[:, :, self.curr_len : self.curr_len + T] = new_v
+        self.curr_len += T
+    
+    def truncate_cache(self, new_len):
+        '''
+        Args:
+            new_len: New sequence length after some tokens have been rejected by the main model
+        '''
+        # Truncate cache if some tokens are rejected by main model
+        self.curr_len = new_len
+    
+    def forward(self, x, use_cache=False):
         '''
         Args:
             x: Input sequence of shape: (B, T, C)
+            use_cache: Boolean variable to determine whether to use KV Cache or not
         '''
         
         B, T, C = x.shape
@@ -157,17 +186,54 @@ class SelfAttention(nn.Module):
         v = v.view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         
         # Apply RoPE
-        cos, sin = self.rope(seq_len=T, device=x.device)
+        rope_offset = self.curr_len if use_cache else 0
+        cos, sin = self.rope(seq_len=T, device=x.device, offset=rope_offset)
         q, k = apply_rope(q, k, cos, sin)
         
-        # Calculate attention scores through SDPA for better speed
-        out = F.scaled_dot_product_attention(
-            q, k, v,
-            dropout_p=self.config.dropout if self.training else 0.0,
-            is_causal=True,
-        )
+        if use_cache:
+            # Use Key-Value Caching
+            if self.k_cache is None:
+                self.k_cache = torch.zeros(
+                    (1, self.n_kv_heads, self.config.context_length, self.head_dim),
+                    dtype=x.dtype, device=x.device
+                )
+                self.v_cache = torch.zeros_like(self.k_cache)
+                self.curr_len = 0
+            
+            # If cache is full, then stop generation
+            assert self.curr_len + T <= self.config.context_length, \
+                "KV Cache overflow: Generation exceeded context length"
+            
+            # Fetch old key and value vectors upto curr_len
+            old_k = self.k_cache[:, :, :self.curr_len]
+            old_v = self.v_cache[:, :, :self.curr_len]
+            # Use the full key and value vectors for attention
+            full_k = torch.cat([old_k, k], dim=2)
+            full_v = torch.cat([old_v, v], dim=2)
+            total_len = self.curr_len + T
+            
+            mask = torch.ones((T, total_len), device=x.device, dtype=bool)
+            mask[:, :self.curr_len] = True # Attend to all past tokens
+            mask[:, self.curr_len:] = torch.tril(mask[:, self.curr_len:]) # causal mask within chunk 
+                
+            # Calculate attention scores
+            out = F.scaled_dot_product_attention(
+                q, full_k, full_v,
+                dropout_p=self.config.dropout if self.training else 0.0,
+                attn_mask=mask,
+                is_causal=False
+            )
+            
+            self.append_cache(T, k, v)
+        else:  
+            # Calculate attention scores through SDPA for better speed
+            out = F.scaled_dot_product_attention(
+                q, k, v,
+                dropout_p=self.config.dropout if self.training else 0.0,
+                is_causal=True,
+            )
+            
         out = out.transpose(1, 2).contiguous().view(B, T, C) # (Batch, Time, Channel)
-        
         return self.proj(out)
     
 class FeedForwardNetwork(nn.Module):
@@ -217,14 +283,15 @@ class Block(nn.Module):
         self.rms1 = nn.RMSNorm(config.n_embd)
         self.rms2 = nn.RMSNorm(config.n_embd)
     
-    def forward(self, x):
+    def forward(self, x, use_cache=False):
         '''
         Args:
             x: Input sequence of shape: (B, T, C)
+            use_cache: Boolean variable to determine whether to use KV Cache or not
         '''
         
-        x = x + self.sa_heads(self.rms1(x)) # Pre-normalization, residual connection + output from sa_heads
-        x = x + self.ffwd(self.rms1(x))     # Pre-normalization, residual connection + output from ffwd net
+        x = x + self.sa_heads(self.rms1(x), use_cache=use_cache) # Pre-normalization, residual connection + output from sa_heads
+        x = x + self.ffwd(self.rms1(x)) # Pre-normalization, residual connection + output from ffwd net
         return x
 
 class DecoderModel(nn.Module):
@@ -258,19 +325,20 @@ class DecoderModel(nn.Module):
         elif isinstance(module, nn.Embedding):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
     
-    def forward(self, idx, targets=None):
+    def forward(self, idx, targets=None, use_cache=False):
         '''
         Args:
             idx: Input sequence of shape: (B, T)
                 where B is batch size and T is sequence length.
             targets: Target sequence of shape: (B, T)
                     If provided, cross-entropy loss is computed.
+            use_cache: Boolean variable to determine whether to use KV Cache or not
         '''
         
         x = self.token_embedding(idx) # (Batch, Time, Channels), Channels = n_embd
         # RoPE handles positional encoding inside each block
         for block in self.blocks:
-            x = block(x)
+            x = block(x, use_cache=use_cache)
         x = self.rms_f(x)
         logits = self.lm_head(x) # (Batch, Time, vocab_size)
         
@@ -284,6 +352,7 @@ class DecoderModel(nn.Module):
             
         return logits, loss
     
+    @torch.no_grad()
     def generate(
         self,
         idx: torch.LongTensor,
@@ -301,19 +370,20 @@ class DecoderModel(nn.Module):
             top_k: If sampling and top_k provided, restrict to top_k (controls the diversity of sampling)
         '''
         
+        self.eval()
         # Generate Tokens autoregressively
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -self.config.context_length:]
             # Generate initial logits
             logits, _ = self(idx_cond)
             # Take only the last logit
-            last_logit = logits[:, -1, :] # (B, C)
+            last_logits = logits[:, -1, :] # (B, C)
             
             if temperature != 1.0 and temperature > 0.0:
-                last_logit = last_logit / temperature
+                last_logits = last_logits / temperature
                 
             if do_sample:
-                probs = F.softmax(last_logit, dim=-1)
+                probs = F.softmax(last_logits, dim=-1)
                 if top_k is not None and top_k > 0:
                     # Take the top_k probs sorted in descending order
                     topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
@@ -327,16 +397,96 @@ class DecoderModel(nn.Module):
                 idx_next = torch.multinomial(probs, num_samples=1)
             else:
                 # If sampling is not allowed then take the argmax of the logits
-                idx_next = torch.argmax(last_logit, dim=-1, keepdim=True)
+                idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
                 
             idx = torch.cat([idx, idx_next], dim=1) # (B, T+1)
         
         return idx
     
-def build_model(device):
-    main_model_config = ModelConfig(n_heads=12, n_layers=12, n_embd=768)
+    @torch.no_grad()
+    def generate_with_cache(
+        self,
+        idx: torch.LongTensor,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+        do_sample: bool = True,
+        top_k: Optional[int] = None
+    ):
+        '''
+        Args:
+            idx: Initial decoder token ids (prompt)
+            max_new_tokens: Maximum number of tokens to generate
+            temperature: Sampling temperature (Controls the creativity of the model)
+            do_sample: If True sample else greedy argmax
+            top_k: If sampling and top_k is provided, restrict to top_k (controls the diversity of sampling)
+        '''
+        
+        self.eval()
+        # reset cache
+        for block in self.blocks:
+            block.sa_heads.reset_cache()
+        
+        # Prefill the decoder cache once
+        logits, _ = self(idx, use_cache=True)
+        last_logits = logits[:, -1, :]
+        
+        if temperature != 1.0 and temperature > 0.0:
+            last_logits = last_logits / temperature
+            
+        if do_sample:
+            probs = F.softmax(last_logits, dim=-1)
+            if top_k is not None and top_k > 0:
+                # Take the top_k probs sorted in descending order
+                topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
+                # Take the minimum of the top_k probs
+                min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
+                allowed_mask = probs >= min_topk
+                # Mask all the probs which are less than min_topk
+                probs = probs * allowed_mask.to(probs.dtype)
+                # Normalize the probs
+                probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+            idx_next = torch.multinomial(probs, num_samples=1)
+        else:
+            # If sampling is not allowed then take the argmax of the logits
+            idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
+        
+        idx = torch.cat([idx, idx_next], dim=1)
+        full_seq = idx.clone()
+        
+        for _ in range(max_new_tokens):
+            # Take only the last token. Position is relative to the cache size
+            last_token = idx[:, -1:]
+            
+            logits, _ = self(last_token, use_cache=True)
+            last_logits = logits[:, -1, :]
+            
+            if temperature != 1.0 and temperature > 0.0:
+                last_logits = last_logits / temperature
+            
+            if do_sample:
+                probs = F.softmax(last_logits, dim=-1)
+                if top_k is not None and top_k > 0:
+                    # Take the top_k probs sorted in descending order
+                    topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
+                    # Take the minimum of the topk_vals
+                    min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
+                    allowed_mask = topk_vals >= min_topk
+                    # Allow only those probs which are greater than min_topk
+                    probs = probs * allowed_mask.to(probs.dtype)
+                    # Normalize the probs
+                    probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+                idx_next = torch.multinomial(probs, num_samples=1)
+            else:
+                # If sampling is not allowed then take the argmax of logits
+                idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
+            
+            idx = torch.cat([idx, idx_next], dim=1)
+            full_seq = torch.cat([full_seq, idx_next], dim=1)
+        
+        return full_seq
     
-    model = DecoderModel(main_model_config)
+def build_model(device, config):
+    model = DecoderModel(config=config)
     model.to(device=device)
     
     return model

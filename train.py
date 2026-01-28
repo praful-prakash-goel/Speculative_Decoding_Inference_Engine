@@ -1,0 +1,133 @@
+import torch
+from data.data_loader import get_batch
+from model.model_architecture import build_model, ModelConfig
+import os
+import math
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+model_name = os.environ.get("MODEL_NAME", "main")
+checkpoint_path = f"saved_models/{model_name.lower()}_model.pt"
+os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
+max_iters = 10_000
+warmup_steps = 200
+eval_iters = 200
+eval_interval = 500
+accumulation_steps = 4
+lr = 3e-4
+weight_decay = 0.1
+
+@torch.no_grad()
+def estimate_loss(model):
+    # Calculate train and validation loss
+    output = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        
+        for iter in range(eval_iters):
+            x, y = get_batch(split=split)
+            _, loss = model(x, y)
+            losses[iter] = loss.item()
+            
+        output[split] = losses.mean()
+        
+    model.train()
+    return output
+
+def get_lr(step, lr, warmup_steps, total_steps):
+    # Learning rate warmup
+    if step < warmup_steps:
+        return lr * (step + 1) / warmup_steps
+    progress = (step - warmup_steps) / (total_steps - warmup_steps)
+    return lr * 0.5 * (1 + math.cos(math.pi * progress))
+    
+def train_model():
+    print("Using:", torch.cuda.get_device_name(0))
+    print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
+    
+    # Build model
+    if model_name.lower() == 'main':
+        model_config = ModelConfig(n_heads=12, n_layers=12, n_embd=768)
+    elif model_name.lower() == 'draft':
+        model_config = ModelConfig(n_heads=4, n_layers=2, n_embd=256)
+    else:
+        print(">> Only two models are available to train: 'main' and 'draft'. Please enter a valid model name")
+        return
+        
+    model = build_model(device=device, config=model_config)
+    print(f">> {model_name.lower()} model: {sum(p.numel() for p in model.parameters())/1e6}M Parameters")
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    
+    # If checkpoint is stored, then load it else start fresh
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        best_val_loss = checkpoint['val_loss']
+        start_iter = checkpoint['iter'] + 1
+        print(f"Restored model from checkpoint at step: {checkpoint['iter']}")
+    else:
+        start_iter = 0
+        best_val_loss = float('inf')
+    
+    end_iter = start_iter + max_iters
+    max_updates = max_iters // accumulation_steps
+    
+    # Training loop
+    optimizer.zero_grad(set_to_none=True)
+    model.train()
+    for iter in range(start_iter, end_iter):
+        if iter % eval_interval == 0 or iter+1 == end_iter:
+            # Evaluate after fixed interval
+            losses = estimate_loss(model)
+            train_loss, val_loss = losses['train'], losses['val']
+            train_perplexity, val_perplexity = torch.exp(train_loss), torch.exp(val_loss)
+            
+            print(f">> Step {iter} - Train Loss: {train_loss}, Train PPL: {train_perplexity}, Val Loss: {val_loss}, Val PPL: {val_perplexity}")
+            
+            # If current val_loss is less than best_val_loss, then store the checkpoint
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                checkpoint = {
+                    "iter": iter,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "val_loss": val_loss,
+                    "train_loss": train_loss
+                }
+                torch.save(checkpoint, checkpoint_path)
+                print(f"Checkpoint saved at step {iter} - train_loss : {train_loss}, val_loss : {val_loss}")
+            
+        # Fetch a training batch
+        x, y = get_batch("train")
+        x = x.to(device)
+        y = y.to(device)
+        
+        with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
+            _, loss = model(x, y)
+            
+        # Normalize the loss
+        loss = loss / accumulation_steps
+        loss.backward()
+        
+        # Update weights only after every accumulation steps
+        if (iter + 1) % accumulation_steps == 0 or (iter+1) == end_iter:
+            # Gradient clipping to prevent exploding gradient problem
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # Update lr
+            update_step = (iter + 1 - start_iter) // accumulation_steps
+            lr_now = get_lr(step=update_step, lr=lr, warmup_steps=warmup_steps, total_steps=max_updates)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr_now
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+        
+    
+if __name__ == '__main__':
+    train_model()
