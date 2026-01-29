@@ -31,6 +31,9 @@ def estimate_loss(model):
         
         for iter in range(eval_iters):
             x, y = get_batch(split=split)
+            x = x.to(device)
+            y = y.to(device)
+            
             _, loss = model(x, y)
             losses[iter] = loss.item()
             
