@@ -128,6 +128,7 @@ class SelfAttention(nn.Module):
         
         super().__init__()
         self.config = config
+        assert config.n_heads % n_kv_heads == 0, "Invalid GQA"
         self.n_heads = config.n_heads
         self.n_kv_heads  = n_kv_heads
         self.head_dim = head_dim
@@ -178,17 +179,25 @@ class SelfAttention(nn.Module):
         B, T, C = x.shape
         # Compute the query, key and value vectors
         q = self.query(x)
-        k = self.key(x)
-        v = self.value(x)
+        k_org = self.key(x)
+        v_org = self.value(x)
         # Reshape q, k and v vectors
         q = q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
-        k = k.view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
-        v = v.view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        k_org = k_org.view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        v_org = v_org.view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         
         # Apply RoPE
         rope_offset = self.curr_len if use_cache else 0
         cos, sin = self.rope(seq_len=T, device=x.device, offset=rope_offset)
-        q, k = apply_rope(q, k, cos, sin)
+        q, k_org = apply_rope(q, k_org, cos, sin)
+        
+        if self.n_heads != self.n_kv_heads:
+            repeat_factor = self.n_heads // self.n_kv_heads
+            k = torch.repeat_interleave(k_org, repeat_factor, dim=1)
+            v = torch.repeat_interleave(v_org, repeat_factor, dim=1)
+        else:
+            k = k_org
+            v = v_org
         
         if use_cache:
             # Use Key-Value Caching
@@ -207,12 +216,18 @@ class SelfAttention(nn.Module):
             # Fetch old key and value vectors upto curr_len
             old_k = self.k_cache[:, :, :self.curr_len]
             old_v = self.v_cache[:, :, :self.curr_len]
+            
+            # Expand cache
+            if self.n_heads != self.n_kv_heads:
+                old_k = torch.repeat_interleave(old_k, repeat_factor, dim=1)
+                old_v = torch.repeat_interleave(old_v, repeat_factor, dim=1)
+                
             # Use the full key and value vectors for attention
             full_k = torch.cat([old_k, k], dim=2)
             full_v = torch.cat([old_v, v], dim=2)
             total_len = self.curr_len + T
             
-            mask = torch.ones((T, total_len), device=x.device, dtype=bool)
+            mask = torch.ones((T, total_len), device=x.device, dtype=torch.bool)
             mask[:, :self.curr_len] = True # Attend to all past tokens
             mask[:, self.curr_len:] = torch.tril(mask[:, self.curr_len:]) # causal mask within chunk 
                 
@@ -224,7 +239,7 @@ class SelfAttention(nn.Module):
                 is_causal=False
             )
             
-            self.append_cache(T, k, v)
+            self.append_cache(T, k_org, v_org)
         else:  
             # Calculate attention scores through SDPA for better speed
             out = F.scaled_dot_product_attention(
