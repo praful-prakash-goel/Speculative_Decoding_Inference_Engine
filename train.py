@@ -13,13 +13,14 @@ os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-max_iters = 10_000
-warmup_steps = 200
+# phase 2 params
+max_iters = 30_000
+warmup_steps = 0
 eval_iters = 20
-eval_interval = 500
+eval_interval = 1_000
 accumulation_steps = 32
-lr = 3e-4
-weight_decay = 0.1
+lr = 1e-4
+weight_decay = 0.15
 
 @torch.no_grad()
 def estimate_loss(model):
