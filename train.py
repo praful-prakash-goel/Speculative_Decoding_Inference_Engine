@@ -15,9 +15,9 @@ torch.backends.cudnn.allow_tf32 = True
 
 max_iters = 10_000
 warmup_steps = 200
-eval_iters = 200
+eval_iters = 20
 eval_interval = 500
-accumulation_steps = 4
+accumulation_steps = 32
 lr = 3e-4
 weight_decay = 0.1
 
