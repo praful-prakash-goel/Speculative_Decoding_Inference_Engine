@@ -108,6 +108,7 @@ def train_model():
         x, y = get_batch("train")
         x = x.to(device)
         y = y.to(device)
+        print(x.device, next(model.parameters()).device)
         
         with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
             _, loss = model(x, y)
