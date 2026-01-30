@@ -135,7 +135,7 @@ def train_model():
             # Gradient clipping to prevent exploding gradient problem
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             # Update lr
-            lr_now = get_lr(step=optimizer_step, lr=base_lr, warmup_steps=warmup_steps, total_steps=max_updates)
+            lr_now = get_lr(step=optimizer_step, base_lr=base_lr, warmup_steps=warmup_steps, total_steps=max_updates)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr_now
             optimizer.step()
