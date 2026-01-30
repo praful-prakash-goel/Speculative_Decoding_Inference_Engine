@@ -21,7 +21,7 @@ warmup_steps = 1_000
 eval_iters = 10
 eval_interval = 2_000
 accumulation_steps = 16
-lr = 6e-5
+base_lr = 6e-5
 weight_decay = 0.1
 
 @torch.no_grad()
@@ -45,12 +45,12 @@ def estimate_loss(model):
     model.train()
     return output
 
-def get_lr(step, lr, warmup_steps, total_steps):
+def get_lr(step, base_lr, warmup_steps, total_steps):
     # Learning rate warmup
     if step < warmup_steps:
-        return lr * (step + 1) / warmup_steps
+        return base_lr * (step + 1) / warmup_steps
     progress = (step - warmup_steps) / (total_steps - warmup_steps)
-    return lr * 0.5 * (1 + math.cos(math.pi * progress))
+    return base_lr * 0.5 * (1 + math.cos(math.pi * progress))
     
 def train_model():
     print("Using:", torch.cuda.get_device_name(0))
@@ -68,7 +68,7 @@ def train_model():
     model = build_model(device=device, config=model_config)
     print(f">> Training {model_name.lower()} model: {sum(p.numel() for p in model.parameters())/1e6}M Parameters")
     
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=weight_decay)
     
     # If checkpoint is stored, then load it else start fresh
     if os.path.exists(checkpoint_path):
@@ -135,7 +135,7 @@ def train_model():
             # Gradient clipping to prevent exploding gradient problem
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             # Update lr
-            lr_now = get_lr(step=optimizer_step, lr=lr_now, warmup_steps=warmup_steps, total_steps=max_updates)
+            lr_now = get_lr(step=optimizer_step, lr=base_lr, warmup_steps=warmup_steps, total_steps=max_updates)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr_now
             optimizer.step()
