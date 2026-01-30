@@ -112,7 +112,7 @@ def train_model():
                 print(f"Checkpoint saved at step {iter} - train_loss : {train_loss}, val_loss : {val_loss}")
             
         if iter % 10_000 == 0:
-            # Test inference of the model after every 10k steps
+            # Test inference of the model after every 10k micro iterations
             print("\n", "=="*50, sep="")
             prompt = "In the future, artificial intelligence will"
             generate(prompt=prompt)
