@@ -1,27 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dataclasses import dataclass
 from typing import Optional
-
-@dataclass
-class ModelConfig:
-    '''
-    Hyperparameters:
-        n_heads: Number of self-attention heads
-        n_layers: Number of decoder layers
-        n_embd: Embedding Dimension
-        context_length: Maximum sequence length allowed
-        vocab_size: Number of distinct characters in the database
-        dropout: Dropout ratio
-    '''
-    
-    n_heads: int
-    n_layers: int
-    n_embd: int
-    context_length: int = 1024
-    vocab_size: int = 50304 # GPT2 vocab size = 50257, we use 50304 because it is a multiple of 64 (GPU Optimization)
-    dropout: float = 0.1
 
 class RotaryEmbedding(nn.Module):
     """
@@ -452,12 +432,10 @@ class DecoderModel(nn.Module):
             probs = F.softmax(last_logits, dim=-1)
             if top_k is not None and top_k > 0:
                 # Take the top_k probs sorted in descending order
-                topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
-                # Take the minimum of the top_k probs
-                min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
-                allowed_mask = probs >= min_topk
-                # Mask all the probs which are less than min_topk
-                probs = probs * allowed_mask.to(probs.dtype)
+                topk_vals, topk_idxs = probs.topk(top_k, dim=-1) # (B, k)
+                # Mask probs which are less than topk
+                probs = torch.zeros_like(probs)
+                probs.scatter_(1, topk_idxs, topk_vals)
                 # Normalize the probs
                 probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
             idx_next = torch.multinomial(probs, num_samples=1)
@@ -483,11 +461,9 @@ class DecoderModel(nn.Module):
                 if top_k is not None and top_k > 0:
                     # Take the top_k probs sorted in descending order
                     topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
-                    # Take the minimum of the topk_vals
-                    min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
-                    allowed_mask = topk_vals >= min_topk
-                    # Allow only those probs which are greater than min_topk
-                    probs = probs * allowed_mask.to(probs.dtype)
+                    # Mask probs which are less than topk
+                    probs = torch.zeros_like(probs)
+                    probs.scatter_(1, topk_idxs, topk_vals)
                     # Normalize the probs
                     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
                 idx_next = torch.multinomial(probs, num_samples=1)
