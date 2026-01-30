@@ -1,6 +1,8 @@
 import torch
 from data.data_loader import get_batch
-from model.model_architecture import build_model, ModelConfig
+from model.model_architecture import build_model
+from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_CONFIG
+from inference.generate import generate
 import os
 import math
 
@@ -13,14 +15,14 @@ os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-# phase 2 params
-max_iters = 30_000
-warmup_steps = 0
-eval_iters = 20
-eval_interval = 1_000
-accumulation_steps = 32
-lr = 1e-4
-weight_decay = 0.15
+# phase 3 params
+max_iters = 80_000
+warmup_steps = 1_000
+eval_iters = 10
+eval_interval = 2_000
+accumulation_steps = 16
+lr = 6e-5
+weight_decay = 0.1
 
 @torch.no_grad()
 def estimate_loss(model):
@@ -56,9 +58,9 @@ def train_model():
     
     # Build model
     if model_name.lower() == 'main':
-        model_config = ModelConfig(n_heads=12, n_layers=12, n_embd=768)
+        model_config = MAIN_MODEL_CONFIG
     elif model_name.lower() == 'draft':
-        model_config = ModelConfig(n_heads=4, n_layers=2, n_embd=256)
+        model_config = DRAFT_MODEL_CONFIG
     else:
         print(">> Only two models are available to train: 'main' and 'draft'. Please enter a valid model name")
         return
@@ -84,6 +86,7 @@ def train_model():
     max_updates = max_iters // accumulation_steps
     
     # Training loop
+    optimizer_step = 0
     optimizer.zero_grad(set_to_none=True)
     model.train()
     for iter in range(start_iter, end_iter):
@@ -108,6 +111,13 @@ def train_model():
                 torch.save(checkpoint, checkpoint_path)
                 print(f"Checkpoint saved at step {iter} - train_loss : {train_loss}, val_loss : {val_loss}")
             
+        if iter % 10_000 == 0:
+            # Test inference of the model after every 10k steps
+            print("\n", "=="*50, sep="")
+            prompt = "In the future, artificial intelligence will"
+            generate(prompt=prompt)
+            print("=="*50, "\n", sep="")
+            
         # Fetch a training batch
         x, y = get_batch("train")
         x = x.to(device)
@@ -121,16 +131,16 @@ def train_model():
         loss.backward()
         
         # Update weights only after every accumulation steps
-        if (iter + 1) % accumulation_steps == 0 or (iter+1) == end_iter:
+        if (iter + 1) % accumulation_steps == 0 or (iter + 1) == end_iter:
             # Gradient clipping to prevent exploding gradient problem
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             # Update lr
-            update_step = (iter + 1 - start_iter) // accumulation_steps
-            lr_now = get_lr(step=update_step, lr=lr, warmup_steps=warmup_steps, total_steps=max_updates)
+            lr_now = get_lr(step=optimizer_step, lr=lr_now, warmup_steps=warmup_steps, total_steps=max_updates)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr_now
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+            optimizer_step += 1
         
     
 if __name__ == '__main__':

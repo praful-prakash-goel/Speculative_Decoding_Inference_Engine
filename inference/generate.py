@@ -20,14 +20,14 @@ def get_model():
     else:
         return None
         
-def generate():
+def generate(prompt):
     model = get_model()
     
     if model == None:
         print("No trained model exists. Please train the model and then try again.")
         sys.exit()
     
-    prompt = input("Please enter the prompt: ")
+    # prompt = input("Please enter the prompt: ")
     input_ids = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=device)
     
     model.eval()

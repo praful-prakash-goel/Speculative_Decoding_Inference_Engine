@@ -9,7 +9,7 @@ TRAIN_BIN = os.path.join(DATA_DIR, "train.bin")
 VAL_BIN = os.path.join(DATA_DIR, "val.bin")
 
 context_length = 1024
-batch_size = 8
+batch_size = 16
 
 train_data = None
 val_data = None
