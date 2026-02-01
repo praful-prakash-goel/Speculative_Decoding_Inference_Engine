@@ -451,17 +451,6 @@ class DecoderModel(nn.Module):
                     
                 probs = F.softmax(last_logits, dim=-1)
                 idx_next = torch.multinomial(probs, num_samples=1)
-                # if top_k is not None and top_k > 0:
-                #     # Take the top_k probs sorted in descending order
-                #     topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
-                #     # Take the minimum of the top_k probs
-                #     min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
-                #     allowed_mask = probs >= min_topk
-                #     # Mask all the probs less than min allowed prob
-                #     probs = probs * allowed_mask.to(probs.dtype)
-                #     # Normalize the probs
-                #     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
-                # idx_next = torch.multinomial(probs, num_samples=1)
             else:
                 # If sampling is not allowed then take the argmax of the logits
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
@@ -511,15 +500,6 @@ class DecoderModel(nn.Module):
             
             probs = F.softmax(last_logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
-            # if top_k is not None and top_k > 0:
-            #     # Take the top_k probs sorted in descending order
-            #     topk_vals, topk_idxs = probs.topk(top_k, dim=-1) # (B, k)
-            #     # Mask probs which are less than topk
-            #     probs = torch.zeros_like(probs)
-            #     probs.scatter_(1, topk_idxs, topk_vals)
-            #     # Normalize the probs
-            #     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
-            # idx_next = torch.multinomial(probs, num_samples=1)
         else:
             # If sampling is not allowed then take the argmax of the logits
             idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
@@ -546,15 +526,6 @@ class DecoderModel(nn.Module):
             
                 probs = F.softmax(last_logits, dim=-1)
                 idx_next = torch.multinomial(probs, num_samples=1)
-                # if top_k is not None and top_k > 0:
-                #     # Take the top_k probs sorted in descending order
-                #     topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
-                #     # Mask probs which are less than topk
-                #     probs = torch.zeros_like(probs)
-                #     probs.scatter_(1, topk_idxs, topk_vals)
-                #     # Normalize the probs
-                #     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
-                # idx_next = torch.multinomial(probs, num_samples=1)
             else:
                 # If sampling is not allowed then take the argmax of logits
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
