@@ -347,6 +347,68 @@ class DecoderModel(nn.Module):
             
         return logits, loss
     
+    def top_p_filtering(self, logits, top_p=0.9, filter_value=-float('Inf')):
+        '''
+        Filter a distribution of logits using top_p (nucleus) sampling
+        
+        Args:
+            logits: The model's prediction logits of shape (B, vocabulary_size)
+            top_p: The cumulative probability threshold (0.0 < top_p <= 1.0)
+            filter_value:Value to replace filtered logits with (usually -inf)
+        '''
+        
+        if top_p <= 0.0 or top_p >= 1.0:
+            return logits
+        
+        # Sort the logits in descending order and get their indices
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        # Calculate cummulative probabilites of the sorted logits
+        cummulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        
+        # Create a mask for tokens to remove: where cumulative probability > top_p
+        sorted_indices_to_remove = cummulative_probs > top_p
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        # Ensure at least one token is always kept
+        sorted_indices_to_remove[..., 0] = False
+        
+        # Filtered tokens will have a probability of zero after softmax
+        mask = torch.zeros_like(logits, dtype=torch.bool)
+        mask.scatter_(1, sorted_indices, sorted_indices_to_remove)
+        
+        logits_filtered = logits.clone()
+        logits_filtered = logits_filtered.masked_fill(mask, filter_value)
+        
+        return logits_filtered
+    
+    def apply_repetition_penalty(self, logits, generated_token_ids, repetition_penalty):
+        '''
+        Applies repetition penalty to the logits
+        
+        Args:
+            logits: The model's prediction logits of shape (B, vocabulary_size)
+            generated_token_ids: Tensor of token ids generated so far
+            repetition_penalty: The penalty value (> 1.0)
+        '''
+        
+        if repetition_penalty == 1.0:
+            return logits
+        
+        penalized_logits = logits.clone()
+        
+        for b in range(logits.size(0)):
+            # Get unique ids generated so far
+            unique_ids = torch.unique(generated_token_ids[b])
+            for token_id in unique_ids:
+                token_id = token_id.item()
+                if penalized_logits[b, token_id] > 0:
+                    # Divide positive logits to make them smaller
+                    penalized_logits[b, token_id] /= repetition_penalty
+                else:
+                    # Multiply negative logits to make them smaller
+                    penalized_logits[b, token_id] *= repetition_penalty
+        
+        return penalized_logits
+        
     @torch.no_grad()
     def generate(
         self,
@@ -354,7 +416,8 @@ class DecoderModel(nn.Module):
         max_new_tokens: int,
         temperature: float = 1.0,
         do_sample: bool = True,
-        top_k: Optional[int] = None
+        top_p: Optional[float] = None,
+        repetition_penalty: Optional[float] = None
     ):
         '''
         Args:
@@ -362,7 +425,8 @@ class DecoderModel(nn.Module):
             max_new_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature (controls the creativity of the model)
             do_sample: If True sample, else greedy argmax
-            top_k: If sampling and top_k provided, restrict to top_k (controls the diversity of sampling)
+            top_p: If sampling and top_p provided, apply top_p (nucleus) sampling (controls the diversity of sampling)
+            repetition_penalty: If provided penalizes repeated tokens (> 1.0)
         '''
         
         self.eval()
@@ -376,20 +440,28 @@ class DecoderModel(nn.Module):
             
             if temperature != 1.0 and temperature > 0.0:
                 last_logits = last_logits / temperature
+            
+            if repetition_penalty is not None:
+                last_logits = self.apply_repetition_penalty(last_logits, idx, repetition_penalty=repetition_penalty)
                 
             if do_sample:
+                if top_p is not None:
+                    # Apply top p sampling
+                    last_logits = self.top_p_filtering(last_logits, top_p)
+                    
                 probs = F.softmax(last_logits, dim=-1)
-                if top_k is not None and top_k > 0:
-                    # Take the top_k probs sorted in descending order
-                    topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
-                    # Take the minimum of the top_k probs
-                    min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
-                    allowed_mask = probs >= min_topk
-                    # Mask all the probs less than min allowed prob
-                    probs = probs * allowed_mask.to(probs.dtype)
-                    # Normalize the probs
-                    probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
                 idx_next = torch.multinomial(probs, num_samples=1)
+                # if top_k is not None and top_k > 0:
+                #     # Take the top_k probs sorted in descending order
+                #     topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
+                #     # Take the minimum of the top_k probs
+                #     min_topk = topk_vals[..., -1].unsqueeze(-1) # (B, 1)
+                #     allowed_mask = probs >= min_topk
+                #     # Mask all the probs less than min allowed prob
+                #     probs = probs * allowed_mask.to(probs.dtype)
+                #     # Normalize the probs
+                #     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+                # idx_next = torch.multinomial(probs, num_samples=1)
             else:
                 # If sampling is not allowed then take the argmax of the logits
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
@@ -405,7 +477,8 @@ class DecoderModel(nn.Module):
         max_new_tokens: int,
         temperature: float = 1.0,
         do_sample: bool = True,
-        top_k: Optional[int] = None
+        top_p: Optional[float] = None,
+        repetition_penalty: Optional[float] = None
     ):
         '''
         Args:
@@ -413,7 +486,8 @@ class DecoderModel(nn.Module):
             max_new_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature (Controls the creativity of the model)
             do_sample: If True sample else greedy argmax
-            top_k: If sampling and top_k is provided, restrict to top_k (controls the diversity of sampling)
+            top_k: If sampling and top_p provided, apply top_p (nucleus) sampling (controls the diversity of sampling)
+            repetition_penalty: If provided penalizes repeated tokens (> 1.0)
         '''
         
         self.eval()
@@ -427,18 +501,25 @@ class DecoderModel(nn.Module):
         
         if temperature != 1.0 and temperature > 0.0:
             last_logits = last_logits / temperature
+        
+        if repetition_penalty is not None:
+            last_logits = self.apply_repetition_penalty(last_logits, idx, repetition_penalty=repetition_penalty)
             
         if do_sample:
+            if top_p is not None:
+                last_logits = self.top_p_filtering(last_logits, top_p)
+            
             probs = F.softmax(last_logits, dim=-1)
-            if top_k is not None and top_k > 0:
-                # Take the top_k probs sorted in descending order
-                topk_vals, topk_idxs = probs.topk(top_k, dim=-1) # (B, k)
-                # Mask probs which are less than topk
-                probs = torch.zeros_like(probs)
-                probs.scatter_(1, topk_idxs, topk_vals)
-                # Normalize the probs
-                probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
             idx_next = torch.multinomial(probs, num_samples=1)
+            # if top_k is not None and top_k > 0:
+            #     # Take the top_k probs sorted in descending order
+            #     topk_vals, topk_idxs = probs.topk(top_k, dim=-1) # (B, k)
+            #     # Mask probs which are less than topk
+            #     probs = torch.zeros_like(probs)
+            #     probs.scatter_(1, topk_idxs, topk_vals)
+            #     # Normalize the probs
+            #     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+            # idx_next = torch.multinomial(probs, num_samples=1)
         else:
             # If sampling is not allowed then take the argmax of the logits
             idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
@@ -446,7 +527,7 @@ class DecoderModel(nn.Module):
         idx = torch.cat([idx, idx_next], dim=1)
         full_seq = idx.clone()
         
-        for _ in range(max_new_tokens):
+        for _ in range(max_new_tokens - 1):
             # Take only the last token. Position is relative to the cache size
             last_token = idx[:, -1:]
             
@@ -456,17 +537,24 @@ class DecoderModel(nn.Module):
             if temperature != 1.0 and temperature > 0.0:
                 last_logits = last_logits / temperature
             
+            if repetition_penalty is not None:
+                last_logits = self.apply_repetition_penalty(last_logits, idx, repetition_penalty=repetition_penalty)
+                
             if do_sample:
+                if top_p is not None:
+                    last_logits = self.top_p_filtering(last_logits, top_p)
+            
                 probs = F.softmax(last_logits, dim=-1)
-                if top_k is not None and top_k > 0:
-                    # Take the top_k probs sorted in descending order
-                    topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
-                    # Mask probs which are less than topk
-                    probs = torch.zeros_like(probs)
-                    probs.scatter_(1, topk_idxs, topk_vals)
-                    # Normalize the probs
-                    probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
                 idx_next = torch.multinomial(probs, num_samples=1)
+                # if top_k is not None and top_k > 0:
+                #     # Take the top_k probs sorted in descending order
+                #     topk_vals, _ = probs.topk(top_k, dim=-1) # (B, k)
+                #     # Mask probs which are less than topk
+                #     probs = torch.zeros_like(probs)
+                #     probs.scatter_(1, topk_idxs, topk_vals)
+                #     # Normalize the probs
+                #     probs = probs / probs.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+                # idx_next = torch.multinomial(probs, num_samples=1)
             else:
                 # If sampling is not allowed then take the argmax of logits
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
