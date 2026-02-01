@@ -20,14 +20,15 @@ def get_model():
     else:
         return None
         
-def generate(prompt):
+def generate(prompt = None):
     model = get_model()
     
     if model == None:
         print("No trained model exists. Please train the model and then try again.")
         sys.exit()
     
-    # prompt = input("Please enter the prompt: ")
+    if prompt is None:
+        prompt = input("Please enter the prompt: ")
     input_ids = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=device)
     
     model.eval()
@@ -35,9 +36,10 @@ def generate(prompt):
         output = model.generate_with_cache(
             idx=input_ids,
             max_new_tokens=200,
-            temperature=0.7,
+            temperature=1.0,
             do_sample=True,
-            top_k=50
+            top_p=0.9,
+            repetition_penalty=1.1
         )[0].tolist()
     text = tokenizer.decode(output)
     
