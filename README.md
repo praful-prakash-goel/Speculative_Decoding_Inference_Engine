@@ -11,7 +11,7 @@ This project addresses the latency bottleneck by implementing a **Speculative De
 ## Plan of Action & Roadmap
 
 ### Phase 1: Training the Models
-- [ ] **Target Model Setup:** Train/Fine-tune a large Transformer model (or initialize a pre-trained base).
+- [x] **Target Model Setup:** Train/Fine-tune a large Transformer model (or initialize a pre-trained base).
 - [ ] **Draft Model Setup:** Train a scaled-down, lightweight version of the target model.
 
 ### Phase 2: Building the Inference Engine
@@ -32,3 +32,15 @@ I will benchmark the engine against three scenarios using metrics like **Tokens/
 | **A. Quality Baseline** | Main Model Only | Exact quality reference. |
 | **B. Speed Baseline** | Draft Model Only | Theoretical upper speed limit. |
 | **C. Speculative Engine** | **Combined Draft + Main** | **Match A's quality with speed approaching B.** |
+
+## ⬇️ Download Pre-trained Models
+
+You can download the trained weights directly from Hugging Face:
+
+| Model | Parameters | Description | Link |
+| :--- | :--- | :--- | :--- |
+| **Main Model** | ~150M | The main target model | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/blob/main/main_model.pt) |
+
+**Setup:**
+1. Download both `.pt` files and their corresponding `.json` configs.
+2. Place them in the `saved_models/` directory.
