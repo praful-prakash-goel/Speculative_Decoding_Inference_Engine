@@ -14,7 +14,7 @@ This project addresses the latency bottleneck by implementing a **Speculative De
 ## Plan of Action & Roadmap
 
 ### Phase 1: Training the Models
-- [x] **Target Model Setup:** Train/Fine-tune a large Transformer model (or initialize a pre-trained base).
+- [x] **Target Model Setup:** Train a large Transformer model.
 - [ ] **Draft Model Setup:** Train a scaled-down, lightweight version of the target model.
 
 ### Phase 2: Building the Inference Engine
