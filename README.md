@@ -33,7 +33,7 @@ I will benchmark the engine against three scenarios using metrics like **Tokens/
 | **B. Speed Baseline** | Draft Model Only | Theoretical upper speed limit. |
 | **C. Speculative Engine** | **Combined Draft + Main** | **Match A's quality with speed approaching B.** |
 
-## ⬇️ Download Pre-trained Models
+## Download Pre-trained Models
 
 You can download the trained weights directly from Hugging Face:
 
