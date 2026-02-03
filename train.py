@@ -8,9 +8,12 @@ import math
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_name = os.environ.get("MODEL_NAME", "main")
-checkpoint_path = f"saved_models/{model_name.lower()}_model.pt"
-os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+model_name = os.environ.get("MODEL_NAME", "main").lower()
+base_dir = "saved_models"
+os.makedirs(base_dir, exist_ok=True)
+
+checkpoint_path = os.path.join(base_dir, f"{model_name}_model.pt")
+config_path = os.path.join(base_dir, f"{model_name}_config.json")
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
@@ -59,11 +62,16 @@ def train_model():
     # Build model
     if model_name.lower() == 'main':
         model_config = MAIN_MODEL_CONFIG
+        # save config to json
+        MAIN_MODEL_CONFIG.save_to_json(config_path)
     elif model_name.lower() == 'draft':
         model_config = DRAFT_MODEL_CONFIG
+        # save config to json
+        DRAFT_MODEL_CONFIG.save_to_json(config_path)
     else:
         print(">> Only two models are available to train: 'main' and 'draft'. Please enter a valid model name")
         return
+    print(f">> Config saved to artifact: {config_path}")
         
     model = build_model(device=device, config=model_config)
     print(f">> Training {model_name.lower()} model: {sum(p.numel() for p in model.parameters())/1e6}M Parameters")
