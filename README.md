@@ -1,5 +1,8 @@
 # Accelerating Autoregressive Transformer Inference via Lossless Speculative Decoding
 
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/praful-goel/speculative_decoding_models)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 ## Problem Statement
 Large Language Models (LLMs) based on the Transformer architecture typically generate tokens in an **auto-regressive manner**, processing one token at a time. This process is highly **memory-bandwidth bound**, as the entire model weights must be loaded from VRAM for every single token generated, leaving GPU compute cores under-utilized.
 
