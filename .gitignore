@@ -18,6 +18,5 @@ venv/
 # =========================
 # Model checkpoints
 # =========================
-saved_models/
 *.pt
 *.pth
