@@ -39,7 +39,7 @@ You can download the trained weights directly from Hugging Face:
 
 | Model | Parameters | Description | Link |
 | :--- | :--- | :--- | :--- |
-| **Main Model** | ~150M | The main target model | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/blob/main/main_model.pt) |
+| **Main Model** | ~150M | The main target model | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/resolve/main/main_model.pt) |
 
 **Setup:**
 1. Download both `.pt` files and their corresponding `.json` configs.
