@@ -18,14 +18,14 @@ config_path = os.path.join(base_dir, f"{model_name}_config.json")
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-# phase 4 params
-max_iters = 40_000
-warmup_steps = 500
-eval_iters = 10
-eval_interval = 2_000
+# phase 1 params for draft model
+max_iters = 20_000
+warmup_steps = 1_000
+eval_iters = 20
+eval_interval = 1_000
 accumulation_steps = 16
-base_lr = 2e-5
-weight_decay = 0.08
+base_lr = 3e-4
+weight_decay = 0.1
 
 @torch.no_grad()
 def estimate_loss(model):
