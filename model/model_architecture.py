@@ -414,8 +414,8 @@ class DecoderModel(nn.Module):
         self,
         idx: torch.LongTensor,
         max_new_tokens: int,
-        temperature: float = 1.0,
-        do_sample: bool = True,
+        temperature: float = 0.0,
+        do_sample: bool = False,
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None
     ):
@@ -464,8 +464,8 @@ class DecoderModel(nn.Module):
         self,
         idx: torch.LongTensor,
         max_new_tokens: int,
-        temperature: float = 1.0,
-        do_sample: bool = True,
+        temperature: float = 0.0,
+        do_sample: bool = False,
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None
     ):
