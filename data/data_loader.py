@@ -15,7 +15,7 @@ train_data = None
 val_data = None
 
 def _init_data():
-    """Helper to load data only when needed"""
+    '''Helper to load data only when needed'''
     
     global train_data, val_data
     
@@ -35,6 +35,13 @@ def _init_data():
         val_data = np.memmap(VAL_BIN, dtype=np.uint16, mode='r')
 
 def get_batch(split="train"):
+    '''
+    Function to generate batches of fixed size
+    
+    Args:
+        split: Split of the dataset ("train" or "val")
+    '''
+    
     # Ensure data is loaded
     if train_data is None:
         _init_data()

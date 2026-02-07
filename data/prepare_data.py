@@ -14,6 +14,15 @@ VAL_TOKENS = 5_000_000
 tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
 
 def write_tokens_streaming(split_name, out_path, max_tokens):
+    '''
+    Stream OpenWebText, tokenize documents, and write GPT-2 token IDs to a binary file until max_tokens is reached.  
+    
+    Args:  
+        split_name: Name used only for logging process ("train" or "val")
+        out_path: Path to the output binary files where token ids will be written
+        max_tokens: Maximum number of tokens to write before stopping
+    '''
+    
     ds = load_dataset("openwebtext", split='train', streaming=True)
     ds = ds.shuffle(buffer_size=10_000, seed=1337)
     

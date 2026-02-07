@@ -29,17 +29,25 @@ weight_decay = 0.1
 
 @torch.no_grad()
 def estimate_loss(model):
-    # Calculate train and validation loss
+    '''
+    Calculate train and validation loss
+    
+    Args:    
+        model: Model which is to be evaluated
+    '''
+    
     output = {}
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         
         for iter in range(eval_iters):
+            # Sample a batch
             x, y = get_batch(split=split)
             x = x.to(device)
             y = y.to(device)
             
+            # Calculate loss
             _, loss = model(x, y)
             losses[iter] = loss.item()
             
@@ -49,10 +57,21 @@ def estimate_loss(model):
     return output
 
 def get_lr(step, base_lr, warmup_steps, total_steps):
-    # Learning rate warmup
+    '''
+    Learning rate warmup with cosine decay
+    
+    Args:    
+        step: Current step in which the model is
+        base_lr: Base learning rate set at the starting of the training
+        warmup_steps: Number of steps to warmup the learning rate
+        total_steps: Total steps for which the model has to be trained
+    '''
+    
+    # Warmup the learning rate
     if step < warmup_steps:
         return base_lr * (step + 1) / warmup_steps
     progress = (step - warmup_steps) / (total_steps - warmup_steps)
+    # Cosine decay
     return base_lr * 0.5 * (1 + math.cos(math.pi * progress))
     
 def train_model():
