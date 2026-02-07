@@ -5,17 +5,21 @@ from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_CONFIG, ModelConfig
 from data.prepare_data import tokenizer
 import sys
 
-model_name = os.environ.get("MODEL_NAME", "main").lower()
-base_dir = "saved_models"
+DEFAULT_MODEL_NAME = os.environ.get("MODEL_NAME", "main").lower()
+BASE_DIR = "saved_models"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-checkpoint_path = os.path.join(base_dir, f"{model_name}_model.pt")
-config_path = os.path.join(base_dir, f"{model_name}_config.json")
-config = DRAFT_MODEL_CONFIG if model_name.lower() == 'draft' else MAIN_MODEL_CONFIG
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-def get_config():
+def get_config(model_name, config_path=None):
+    '''
+    Retrieves config for a specific model name
+    
+    Args:
+        model_name: Name of the model for which the config has to be loaded
+        config_path: Path where to look for the config file
+    '''
+    
     # Load config from json file if it exists
-    if os.path.exists(config_path):
+    if config_path and os.path.exists(config_path):
         print(f">> Loading config from artifact: {config_path}")
         return ModelConfig.from_json(config_path)
 
@@ -28,10 +32,24 @@ def get_config():
     else:
         raise ValueError(f">> Unknown model name: {model_name}")
         
-def get_model():
+def get_model(model_name=DEFAULT_MODEL_NAME, checkpoint_dir=BASE_DIR, device=DEVICE):
+    '''
+    Loads model by name: "main" or "draft"
+    
+    Args:
+        model_name: Name of the model to load
+        checkpoint_dir: Base dir from where the checkpoint will be loaded
+        device: Device to use
+    '''
+    
+    # Construct path dynamically based on the model requested
+    checkpoint_path = os.path.join(checkpoint_dir, f"{model_name}_model.pt")
+    config_path = os.path.join(checkpoint_dir, f"{model_name}_config.json")
+    
+    # Load the checkpoint of the requested model if exist
     if os.path.exists(checkpoint_path):
         # Load config
-        config = get_config()
+        config = get_config(model_name, config_path)
         
         # Build the model
         print(f">> Building {model_name} model...")
@@ -43,11 +61,21 @@ def get_model():
         
         return model
     else:
+        print(f"Checkpoint doesn't exist at {checkpoint_path}")
         return None
         
-def generate(prompt = None, model = None):
+def generate(prompt = None, model = None, device=DEVICE):
+    '''
+    Generate the output tokens based on the given prompt
+    
+    Args:
+        prompt: Initial decoder tokens
+        model: Model to use for generation of the tokens
+        device: Device to use for generation
+    '''
+    
     if model == None:
-        print(f"No model found, either checkpoint doesn't exist at {checkpoint_path} or the model is not passed as the parameter.")
+        print(f"No model found, either checkpoint doesn't exist or the model is not passed as the parameter.")
         sys.exit()
     
     if prompt is None:
