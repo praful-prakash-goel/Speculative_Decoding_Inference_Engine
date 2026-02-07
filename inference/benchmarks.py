@@ -30,7 +30,7 @@ def calculate_tps(generate_func, model_name, device=DEVICE, prompts=PROMPTS):
     # Warmup the model
     for _ in range(2):
         input_ids = torch.tensor([tokenizer.encode("Warmup")], dtype=torch.long, device=device)
-        _ = generate_func(input_ids, max_new_tokens=100)
+        _ = generate_func(input_ids, max_new_tokens=512)
 
     # Actual Test
     print(f"\n>> Running benchmark for {model_name}...")
@@ -41,7 +41,7 @@ def calculate_tps(generate_func, model_name, device=DEVICE, prompts=PROMPTS):
         if device == "cuda": torch.cuda.synchronize()
         start_time = time.time()
         
-        output_ids = generate_func(input_ids, max_new_tokens=100)
+        output_ids = generate_func(input_ids, max_new_tokens=512)
         
         # Stop timer
         if device == "cuda": torch.cuda.synchronize()
