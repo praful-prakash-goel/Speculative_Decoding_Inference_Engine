@@ -83,6 +83,6 @@ if __name__ == '__main__':
 
         
         print(f"\n>> Average tokens per second for main model, without cache: {tps_main_without_cache}, with_cache: {tps_main_with_cache}")
-        print(f">> Average tokens per second for draft model, without cache: {tps_draft_without_cache}, with_cache: {tps_main_with_cache}")
+        print(f">> Average tokens per second for draft model, without cache: {tps_draft_without_cache}, with_cache: {tps_draft_with_cache}")
     else:
         print(f">> Error while loading models.")
