@@ -64,7 +64,7 @@ def get_model(model_name=DEFAULT_MODEL_NAME, checkpoint_dir=BASE_DIR, device=DEV
         print(f"Checkpoint doesn't exist at {checkpoint_path}")
         return None
         
-def generate(prompt = None, model = None, device=DEVICE):
+def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200):
     '''
     Generate the output tokens based on the given prompt
     
@@ -72,6 +72,7 @@ def generate(prompt = None, model = None, device=DEVICE):
         prompt: Initial decoder tokens
         model: Model to use for generation of the tokens
         device: Device to use for generation
+        max_new_tokens: Maximum number of tokens to generate
     '''
     
     if model == None:
@@ -86,7 +87,7 @@ def generate(prompt = None, model = None, device=DEVICE):
     with torch.no_grad():
         output = model.generate_with_cache(
             idx=input_ids,
-            max_new_tokens=200,
+            max_new_tokens=max_new_tokens,
             temperature=1.0,
             do_sample=True,
             top_p=0.9,
