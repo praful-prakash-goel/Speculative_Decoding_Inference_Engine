@@ -45,11 +45,9 @@ def get_model():
     else:
         return None
         
-def generate(prompt = None):
-    model = get_model()
-    
+def generate(prompt = None, model = None):
     if model == None:
-        print(f"No checkpoint found at {checkpoint_path}. Please train the model and then try again.")
+        print(f"No model found, either checkpoint doesn't exist at {checkpoint_path} or the model is not passed as the parameter.")
         sys.exit()
     
     if prompt is None:
@@ -71,4 +69,5 @@ def generate(prompt = None):
     print(f"\n>> Output: {text}")
     
 if __name__ == '__main__':
-    generate()
+    model = get_model()
+    generate(model=model)

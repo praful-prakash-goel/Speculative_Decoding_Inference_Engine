@@ -123,7 +123,7 @@ def train_model():
             # Test inference of the model after every 10k micro iterations
             print("\n", "=="*50, sep="")
             prompt = "In the future, artificial intelligence will"
-            generate(prompt=prompt)
+            generate(prompt=prompt, model=model)
             print("=="*50, "\n", sep="")
             
         # Fetch a training batch
