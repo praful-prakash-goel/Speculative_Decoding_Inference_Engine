@@ -409,8 +409,48 @@ class DecoderModel(nn.Module):
         
         return penalized_logits
         
-    @torch.no_grad()
     def generate(
+        self,
+        idx: torch.LongTensor,
+        max_new_tokens: int,
+        temperature: float = 0.0,
+        do_sample: bool = False,
+        top_p: Optional[float] = None,
+        repetition_penalty: Optional[float] = None,
+        use_cache = True
+    ):
+        '''
+        Args:
+            idx: (B, T_start) initial decoder token ids (prompt)
+            max_new_tokens: Maximum number of tokens to generate
+            temperature: Sampling temperature (controls the creativity of the model)
+            do_sample: If True sample, else greedy argmax
+            top_p: If sampling and top_p provided, apply top_p (nucleus) sampling (controls the diversity of sampling)
+            repetition_penalty: If provided penalizes repeated tokens (> 1.0)
+            use_cache: Flag to determine whether to use cache or not
+        '''
+        
+        if use_cache:
+            return self.generate_with_cache(
+                idx=idx,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                do_sample=do_sample,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty
+            )
+        else:
+            return self.generate_without_cache(
+                idx=idx,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                do_sample=do_sample,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty
+            )
+    
+    @torch.no_grad()
+    def generate_without_cache(
         self,
         idx: torch.LongTensor,
         max_new_tokens: int,
@@ -505,7 +545,6 @@ class DecoderModel(nn.Module):
             idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
         
         idx = torch.cat([idx, idx_next], dim=1)
-        full_seq = idx.clone()
         
         for _ in range(max_new_tokens - 1):
             # Take only the last token. Position is relative to the cache size
@@ -531,9 +570,8 @@ class DecoderModel(nn.Module):
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
             
             idx = torch.cat([idx, idx_next], dim=1)
-            full_seq = torch.cat([full_seq, idx_next], dim=1)
         
-        return full_seq
+        return idx
     
 def build_model(device, config):
     model = DecoderModel(config=config)

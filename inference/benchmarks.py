@@ -13,7 +13,7 @@ PROMPTS = [
     "The history of the Roman Empire is vast and"
 ]
 
-def calculate_tps(generate_func, model_name, device=DEVICE, prompts=PROMPTS):
+def calculate_tps(generate_func, model_name, use_cache, device=DEVICE, prompts=PROMPTS):
     '''
     Calculates average tokens per second for the given model
     
@@ -30,7 +30,7 @@ def calculate_tps(generate_func, model_name, device=DEVICE, prompts=PROMPTS):
     # Warmup the model
     for _ in range(2):
         input_ids = torch.tensor([tokenizer.encode("Warmup")], dtype=torch.long, device=device)
-        _ = generate_func(input_ids, max_new_tokens=512)
+        _ = generate_func(input_ids, max_new_tokens=512, use_cache=use_cache)
 
     # Actual Test
     print(f"\n>> Running benchmark for {model_name}...")
@@ -41,7 +41,7 @@ def calculate_tps(generate_func, model_name, device=DEVICE, prompts=PROMPTS):
         if device == "cuda": torch.cuda.synchronize()
         start_time = time.time()
         
-        output_ids = generate_func(input_ids, max_new_tokens=512)
+        output_ids = generate_func(input_ids, max_new_tokens=512, use_cache=use_cache)
         
         # Stop timer
         if device == "cuda": torch.cuda.synchronize()
@@ -69,17 +69,17 @@ if __name__ == '__main__':
     # Load the models
     print(">> Loading Main Model...")
     main_model = get_model(model_name="main")
-    print(">> Loading Draft Model...")
+    print("\n>> Loading Draft Model...")
     draft_model = get_model(model_name="draft")
     
     if main_model and draft_model:
         # Calculate avg tps for main model
-        tps_main_without_cache = calculate_tps(generate_func=main_model.generate, model_name="main")
-        tps_main_with_cache = calculate_tps(generate_func=main_model.generate_with_cache, model_name="main")
+        tps_main_without_cache = calculate_tps(generate_func=main_model.generate, model_name="main", use_cache=False)
+        tps_main_with_cache = calculate_tps(generate_func=main_model.generate, model_name="main", use_cache=True)
 
         # Calculate avg tps for draft model
-        tps_draft_without_cache = calculate_tps(generate_func=draft_model.generate, model_name="draft")
-        tps_draft_with_cache = calculate_tps(generate_func=draft_model.generate_with_cache, model_name="draft")
+        tps_draft_without_cache = calculate_tps(generate_func=draft_model.generate, model_name="draft", use_cache=False)
+        tps_draft_with_cache = calculate_tps(generate_func=draft_model.generate, model_name="draft", use_cache=True)
 
         
         print(f"\n>> Average tokens per second for main model, without cache: {tps_main_without_cache}, with_cache: {tps_main_with_cache}")

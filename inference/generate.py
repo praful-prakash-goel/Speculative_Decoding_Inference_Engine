@@ -6,6 +6,7 @@ from data.prepare_data import tokenizer
 import sys
 
 DEFAULT_MODEL_NAME = os.environ.get("MODEL_NAME", "main").lower()
+USE_CACHE = os.environ.get("USE_CACHE", "True").lower()
 BASE_DIR = "saved_models"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -64,7 +65,7 @@ def get_model(model_name=DEFAULT_MODEL_NAME, checkpoint_dir=BASE_DIR, device=DEV
         print(f"Checkpoint doesn't exist at {checkpoint_path}")
         return None
         
-def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200):
+def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200, use_cache=True):
     '''
     Generate the output tokens based on the given prompt
     
@@ -85,13 +86,14 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200):
     
     model.eval()
     with torch.no_grad():
-        output = model.generate_with_cache(
+        output = model.generate(
             idx=input_ids,
             max_new_tokens=max_new_tokens,
             temperature=1.0,
             do_sample=True,
             top_p=0.9,
-            repetition_penalty=1.1
+            repetition_penalty=1.1,
+            use_cache=use_cache
         )[0].tolist()
     text = tokenizer.decode(output)
     
@@ -99,4 +101,10 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200):
     
 if __name__ == '__main__':
     model = get_model()
-    generate(model=model)
+    
+    if USE_CACHE == "false":
+        use_cache=False
+    else:
+        use_cache=True
+        
+    generate(model=model, use_cache=use_cache)
