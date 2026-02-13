@@ -393,21 +393,25 @@ class DecoderModel(nn.Module):
         if repetition_penalty == 1.0:
             return logits
         
-        penalized_logits = logits.clone()
+        for b in range(logits.shape[0]):
+            # Get unique tokens for this batch item
+            unique_tokens = generated_token_ids[b].unique()
+            
+            # Gather the current logits for these tokens
+            selected_logits = logits[b, unique_tokens]
+            
+            # Apply repetition penalty
+            # If logit > 0 -> divide else multiply
+            penalized_logits = torch.where(
+                selected_logits > 0,
+                selected_logits / repetition_penalty,
+                selected_logits * repetition_penalty
+            )
+            
+            # Scatter back into the original logits tensor
+            logits[b].scatter_(0, unique_tokens, penalized_logits)
         
-        for b in range(logits.size(0)):
-            # Get unique ids generated so far
-            unique_ids = torch.unique(generated_token_ids[b])
-            for token_id in unique_ids:
-                token_id = token_id.item()
-                if penalized_logits[b, token_id] > 0:
-                    # Divide positive logits to make them smaller
-                    penalized_logits[b, token_id] /= repetition_penalty
-                else:
-                    # Multiply negative logits to make them smaller
-                    penalized_logits[b, token_id] *= repetition_penalty
-        
-        return penalized_logits
+        return logits
         
     def generate(
         self,
@@ -520,9 +524,6 @@ class DecoderModel(nn.Module):
         '''
         
         self.eval()
-        # reset cache
-        for block in self.blocks:
-            block.sa_heads.reset_cache()
         
         # Prefill the decoder cache once
         logits, _ = self(idx, use_cache=True)
