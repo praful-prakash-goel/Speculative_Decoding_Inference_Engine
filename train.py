@@ -19,10 +19,10 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 # phase 1 params for draft model
-max_iters = 20_000
-warmup_steps = 1_000
+max_iters = 40_000
+warmup_steps = 2_000
 eval_iters = 20
-eval_interval = 1_000
+eval_interval = 2_000
 accumulation_steps = 16
 base_lr = 3e-4
 weight_decay = 0.1
@@ -142,7 +142,7 @@ def train_model():
             # Test inference of the model after every 10k micro iterations
             print("\n", "=="*50, sep="")
             prompt = "In the future, artificial intelligence will"
-            generate(prompt=prompt, model=model)
+            generate(prompt=prompt, model=model, max_new_tokens=200)
             print("=="*50, "\n", sep="")
             
         # Fetch a training batch
