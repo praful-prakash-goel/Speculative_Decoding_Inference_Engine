@@ -119,6 +119,9 @@ if __name__ == '__main__':
         "--gamma", type=int, default=5, help="Number of draft tokens to speculate per step"
     )
     parser.add_argument(
+        "--max_new_tokens", type=int, default=512, help="Maximum number of tokens to generate"
+    )
+    parser.add_argument(
         "--no_cache", action="store_true", help="Disable KV Cache"
     )
     parser.add_argument(
@@ -128,6 +131,7 @@ if __name__ == '__main__':
     
     draft_model_name = args.draft_model
     gamma = args.gamma
+    max_new_tokens = args.max_new_tokens
     use_cache = not args.no_cache
     return_stats = args.return_stats
     
@@ -151,12 +155,12 @@ if __name__ == '__main__':
         )
         
         if return_stats:
-            output_ids, acceptance_rate, mean_accepted = generate_speculative(main_model, draft_model, input_ids, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
+            output_ids, acceptance_rate, mean_accepted = generate_speculative(main_model, draft_model, input_ids, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
         else:
-            output_ids = generate_speculative(main_model, draft_model, input_ids, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
+            output_ids = generate_speculative(main_model, draft_model, input_ids, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
 
         text = tokenizer.decode(output_ids[0].tolist())
         print(f"\n>> Output: {text}")
         if return_stats:
-            print(f"\n>> Acceptance rate: {acceptance_rate}")
+            print(f"\n>> Acceptance rate: {acceptance_rate*100}%")
             print(f">> Mean Accepted tokens: {mean_accepted}")

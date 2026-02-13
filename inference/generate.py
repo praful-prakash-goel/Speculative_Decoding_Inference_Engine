@@ -117,13 +117,17 @@ if __name__ == '__main__':
         choices=["main", "draft_small", "draft_medium"], help="Select model to use for generation"
     )
     parser.add_argument(
+        "--max_new_tokens", type=int, default=512, help="Maximum number of tokens to generate"
+    )
+    parser.add_argument(
         "--no_cache", action="store_true", help="Disable KV cache"
     )
     args = parser.parse_args()
     
     model_name = args.model
+    max_new_tokens = args.max_new_tokens
     use_cache = not args.no_cache
     
     # Load the model and generate the output
     model = get_model(model_name=model_name)
-    generate(model=model, use_cache=use_cache)
+    generate(model=model, use_cache=use_cache, max_new_tokens=max_new_tokens)
