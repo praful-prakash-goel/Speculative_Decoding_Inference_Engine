@@ -41,9 +41,9 @@ MAIN_MODEL_CONFIG = ModelConfig(
 )
 
 DRAFT_MODEL_CONFIG = ModelConfig(
-    n_heads=4,
-    n_layers=2,
-    n_embd=256,
+    n_heads=6,
+    n_layers=6,
+    n_embd=512,
 )
 
 if __name__ == "__main__":
