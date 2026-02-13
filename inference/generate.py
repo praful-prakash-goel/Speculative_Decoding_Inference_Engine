@@ -1,12 +1,11 @@
 import os
 import torch
 from model.model_architecture import build_model
-from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_CONFIG, ModelConfig
+from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_SMALL_CONFIG, DRAFT_MODEL_MEDIUM_CONFIG, ModelConfig
 from data.prepare_data import tokenizer
 import sys
+import argparse
 
-DEFAULT_MODEL_NAME = os.environ.get("MODEL_NAME", "main").lower()
-USE_CACHE = os.environ.get("USE_CACHE", "True").lower()
 BASE_DIR = "saved_models"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -28,12 +27,14 @@ def get_config(model_name, config_path=None):
     print(f">> JSON not found. Using hardcoded python config for {model_name} model...")
     if model_name == 'main':
         return MAIN_MODEL_CONFIG
-    elif model_name == 'draft':
-        return DRAFT_MODEL_CONFIG
+    elif model_name == 'draft_small':
+        return DRAFT_MODEL_SMALL_CONFIG
+    elif model_name == 'draft_medium':
+        return DRAFT_MODEL_MEDIUM_CONFIG
     else:
         raise ValueError(f">> Unknown model name: {model_name}")
         
-def get_model(model_name=DEFAULT_MODEL_NAME, checkpoint_dir=BASE_DIR, device=DEVICE):
+def get_model(model_name, checkpoint_dir=BASE_DIR, device=DEVICE):
     '''
     Loads model by name: "main" or "draft"
     
@@ -62,8 +63,7 @@ def get_model(model_name=DEFAULT_MODEL_NAME, checkpoint_dir=BASE_DIR, device=DEV
         
         return model
     else:
-        print(f"Checkpoint doesn't exist at {checkpoint_path}")
-        return None
+        raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
         
 def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=512, use_cache=True):
     '''
@@ -81,14 +81,18 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=512, use
         print(f"No model found, either checkpoint doesn't exist or the model is not passed as the parameter.")
         sys.exit()
     
+    # If model is using cache, then reset cache before generation
     if use_cache:
         for block in model.blocks:
             block.sa_heads.reset_cache()
             
+    # Take prompt as input if not already provided
     if prompt is None:
         prompt = input("Please enter the prompt: ")
+    # Tokenize the prompt
     input_ids = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=device)
     
+    # Generate output for the given input ids
     model.eval()
     with torch.no_grad():
         output = model.generate(
@@ -105,11 +109,21 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=512, use
     print(f"\n>> Output: {text}")
     
 if __name__ == '__main__':
-    model = get_model()
+    # CLI Arguments
+    parser = argparse.ArgumentParser(description="Generate Function")
     
-    if USE_CACHE == "false":
-        use_cache=False
-    else:
-        use_cache=True
-
+    parser.add_argument(
+        "--model", type=str, default="main",
+        choices=["main", "draft_small", "draft_medium"], help="Select model to use for generation"
+    )
+    parser.add_argument(
+        "--no_cache", action="store_true", help="Disable KV cache"
+    )
+    args = parser.parse_args()
+    
+    model_name = args.model
+    use_cache = not args.no_cache
+    
+    # Load the model and generate the output
+    model = get_model(model_name=model_name)
     generate(model=model, use_cache=use_cache)
