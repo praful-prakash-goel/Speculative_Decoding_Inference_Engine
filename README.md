@@ -144,12 +144,12 @@ Speculative_Decoding_Inference_Engine/
 │   ├── __init__.py
 │   ├── data_loader.py
 │   └── prepare_data.py
-|
+│
 ├── experiments/
 │   ├── __init__.py
 │   ├── benchmark_tps.py
 │   └── evaluate_alignment.py
-|
+│
 ├── inference/
 │   ├── __init__.py
 │   ├── generate.py
@@ -162,7 +162,7 @@ Speculative_Decoding_Inference_Engine/
 │
 ├── saved_models/
 │   ├── draft_medium_config.json
-|   ├── draft_small_config.json
+│   ├── draft_small_config.json
 │   └── main_config.json
 │
 ├── .gitignore
