@@ -40,7 +40,13 @@ MAIN_MODEL_CONFIG = ModelConfig(
     n_embd=768,
 )
 
-DRAFT_MODEL_CONFIG = ModelConfig(
+DRAFT_MODEL_SMALL_CONFIG = ModelConfig(
+    n_heads=4,
+    n_layers=2,
+    n_embd=256,
+)
+
+DRAFT_MODEL_MEDIUM_CONFIG = ModelConfig(
     n_heads=8,
     n_layers=6,
     n_embd=512,
@@ -57,4 +63,5 @@ if __name__ == "__main__":
     print(f"Generating artifacts in {save_dir}/ ...")
     
     MAIN_MODEL_CONFIG.save_to_json(os.path.join(save_dir, "main_config.json"))
-    DRAFT_MODEL_CONFIG.save_to_json(os.path.join(save_dir, "draft_config.json"))
+    DRAFT_MODEL_SMALL_CONFIG.save_to_json(os.path.join(save_dir, "draft_small_config.json"))
+    DRAFT_MODEL_MEDIUM_CONFIG.save_to_json(os.path.join(save_dir, "draft_large_config.json"))
