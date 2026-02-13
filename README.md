@@ -21,9 +21,9 @@ This project addresses the latency bottleneck by implementing a **Speculative De
 
 ### Phase 2: Building the Inference Engine
 The core of this project is the custom inference script:
-- [ ] **Drafting:** Implement logic where the draft model generates `k` speculative tokens.
-- [ ] **Verification:** Target model verifies all `k` tokens in a single parallel forward pass.
-- [ ] **Correction & Rollback:** Implement KV-Cache rollback to prune invalid branches if a token is rejected.
+- [x] **Drafting:** Implement logic where the draft model generates `k` speculative tokens.
+- [x] **Verification:** Target model verifies all `k` tokens in a single parallel forward pass.
+- [x] **Correction & Rollback:** Implement KV-Cache rollback to prune invalid branches if a token is rejected.
 
 > **Logic:**
 > * **Best Case:** Accept all `k` draft tokens + 1 target token (`k+1` tokens for the cost of 1).
@@ -48,7 +48,8 @@ You can download the trained weights directly from Hugging Face:
 | Model | Parameters | Description | Link |
 | :--- | :--- | :--- | :--- |
 | **Main Model** | ~150M | The main larger target model which is used for the final output | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/resolve/main/main_model.pt) |
-| **Draft Model** | ~30M | The smaller, lightweight version of the main model which is used to quickly predict the upcoming tokens | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/resolve/main/draft_model.pt)
+| **Draft Model (Small)** | ~30M | The smaller, lightweight version of the main model which is used to quickly predict the upcoming tokens | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/resolve/main/draft_small_model.pt) |
+| **Draft Model (Medium)** | ~70M | The medium version of the main model which is used to quickly predict the upcoming tokens | [Download .pt](https://huggingface.co/praful-goel/speculative_decoding_models/resolve/main/draft_medium_model.pt) |
 
 **Setup:**
 1. Download both `.pt` files and their corresponding `.json` configs.
@@ -66,16 +67,16 @@ Instead of using off-the-shelf models (e.g., GPT-2, Llama), this projects implem
 
 Both models are **Decoder-only Transformers** (GPT-style) implemented in pure PyTorch.
 
-| Hyperparameters | Main Model (Target) | Draft Model (Speculator) |
-| :--- | :--- | :--- |
-| **Parameters** | ~150M | ~30M |
-| **Layers** | 12 | 2 |
-| **Heads** | 12 | 4 |
-| **Embedding Dim** | 768 | 256 |
-| **Context Length** | 1024 | 1024 |
-| **Vocab Size** | 50304 | 50304 |
-| **Droupout** | 0.1 | 0.1 |
-| **Dataset** | OpenWebText (Sample) | OpenWebText (Sample) |
+| Hyperparameters | Main Model (Target) | Draft Model (Small) | Draft Model (Medium) |
+| :--- | :--- | :--- | :--- |
+| **Parameters** | ~150M | ~30M | ~70M |
+| **Layers** | 12 | 2 | 6 |
+| **Heads** | 12 | 4 | 8 |
+| **Embedding Dim** | 768 | 256 | 512 |
+| **Context Length** | 1024 | 1024 | 1024 |
+| **Vocab Size** | 50304 | 50304 | 50304 |
+| **Droupout** | 0.1 | 0.1 | 0.1 | 
+| **Dataset** | OpenWebText (Sample) | OpenWebText (Sample) | OpenWebText (Sample) |
 
 ### Key Components
 
@@ -107,8 +108,8 @@ The main model was trained in 4 distinct phases to hande hardware constraints an
 | **Phase 3** | **Large-Batch Scaling** | 50_000 | 1_000 | 10 | 2_000 | 16 | 6e-5 | 0.1 | 16 |
 | **Phase 4** | **Convergence** | 40_000 | 500 | 10 | 2_000 | 16 | 2e-5 | 0.08 | 16 |
 
-#### Draft Model
-The draft model was trained only once
+#### Draft Model (Small)
+The draft model (small) was trained only once
 
 ```python
 max_iters = 40_000
@@ -121,6 +122,19 @@ weight_decay=0.1
 batch_size = 16
 ```
 
+#### Draft Model (Medium)
+The draft model (medium) was trained only once
+
+```python
+max_iters = 40_000
+warmup_steps = 2_000
+eval_iters = 20
+eval_interval = 2_000
+accumulation_steps = 16
+base_lr = 3e-4
+weight_decay = 0.1
+```
+
 ## Project Structure
 
 ```bash
@@ -130,10 +144,16 @@ Speculative_Decoding_Inference_Engine/
 │   ├── __init__.py
 │   ├── data_loader.py
 │   └── prepare_data.py
+|
+├── experiments/
+│   ├── __init__.py
+│   ├── benchmark_tps.py
+│   └── evaluate_alignment.py
+|
 ├── inference/
 │   ├── __init__.py
-│   ├── benchmarks.py
-│   └── generate.py
+│   ├── generate.py
+│   └── speculative_engine.py
 │
 ├── model/
 │   ├── __init__.pt
@@ -141,7 +161,8 @@ Speculative_Decoding_Inference_Engine/
 │   └── model_architecture.py
 │
 ├── saved_models/
-│   ├── draft_config.json
+│   ├── draft_medium_config.json
+|   ├── draft_small_config.json
 │   └── main_config.json
 │
 ├── .gitignore
