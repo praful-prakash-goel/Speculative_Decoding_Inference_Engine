@@ -1,24 +1,20 @@
 import torch
 from data.data_loader import get_batch
 from model.model_architecture import build_model
-from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_CONFIG
+from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_SMALL_CONFIG, DRAFT_MODEL_MEDIUM_CONFIG
 from inference.generate import generate
 import os
 import math
+import argparse
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-model_name = os.environ.get("MODEL_NAME", "main").lower()
 base_dir = "saved_models"
 os.makedirs(base_dir, exist_ok=True)
-
-checkpoint_path = os.path.join(base_dir, f"{model_name}_model.pt")
-config_path = os.path.join(base_dir, f"{model_name}_config.json")
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-# phase 1 params for draft model
+# Training Hyperparameters
 max_iters = 40_000
 warmup_steps = 2_000
 eval_iters = 20
@@ -74,22 +70,36 @@ def get_lr(step, base_lr, warmup_steps, total_steps):
     # Cosine decay
     return base_lr * 0.5 * (1 + math.cos(math.pi * progress))
     
-def train_model():
-    print("Using:", torch.cuda.get_device_name(0))
-    print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
+def train_model(model_name, checkpoint_path, config_path):
+    '''
+    Function for training loop
+    
+    Args:
+        model_name: Name of the model to use
+        checkpoint_path: Path to the directory where checkpoint should be stored
+        config_path: Path to the directory where config file should be stored
+    '''
+    
+    if torch.cuda.is_available():
+        print("Using:", torch.cuda.get_device_name(0))
+        print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
     
     # Build model
-    if model_name.lower() == 'main':
+    if model_name == 'main':
         model_config = MAIN_MODEL_CONFIG
         # save config to json
         MAIN_MODEL_CONFIG.save_to_json(config_path)
-    elif model_name.lower() == 'draft':
-        model_config = DRAFT_MODEL_CONFIG
+    elif model_name == 'draft_small':
+        model_config = DRAFT_MODEL_SMALL_CONFIG
         # save config to json
-        DRAFT_MODEL_CONFIG.save_to_json(config_path)
+        DRAFT_MODEL_SMALL_CONFIG.save_to_json(config_path)
+    elif model_name == 'draft_medium':
+        model_config = DRAFT_MODEL_MEDIUM_CONFIG
+        # save config to json
+        DRAFT_MODEL_MEDIUM_CONFIG.save_to_json(config_path)
     else:
-        print(">> Only two models are available to train: 'main' and 'draft'. Please enter a valid model name")
-        return
+        raise ValueError(f">> Unknown model name: {model_name}. Only three models are available to train: 'main', 'draft_small' and 'draft_medium'.")
+
     print(f">> Config saved to artifact: {config_path}")
         
     model = build_model(device=device, config=model_config)
@@ -171,4 +181,16 @@ def train_model():
         
     
 if __name__ == '__main__':
-    train_model()
+    parser = argparse.ArgumentParser("Training Loop")
+    
+    parser.add_argument(
+        "--model", type=str, default="main",
+        choices=["main", "draft_small", "draft_medium"], help="Select model to use for generation"
+    )
+    args = parser.parse_args()
+    
+    model_name = args.model
+    checkpoint_path = os.path.join(base_dir, f"{model_name}_model.pt")
+    config_path = os.path.join(base_dir, f"{model_name}_config.json")
+    
+    train_model(model_name, checkpoint_path, config_path)
