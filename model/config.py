@@ -41,7 +41,7 @@ MAIN_MODEL_CONFIG = ModelConfig(
 )
 
 DRAFT_MODEL_CONFIG = ModelConfig(
-    n_heads=6,
+    n_heads=8,
     n_layers=6,
     n_embd=512,
 )
