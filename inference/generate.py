@@ -65,7 +65,7 @@ def get_model(model_name=DEFAULT_MODEL_NAME, checkpoint_dir=BASE_DIR, device=DEV
         print(f"Checkpoint doesn't exist at {checkpoint_path}")
         return None
         
-def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200, use_cache=True):
+def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=512, use_cache=True):
     '''
     Generate the output tokens based on the given prompt
     
@@ -74,12 +74,17 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200, use
         model: Model to use for generation of the tokens
         device: Device to use for generation
         max_new_tokens: Maximum number of tokens to generate
+        use_cache: Boolean variable to determine whether to use cache or not
     '''
     
     if model == None:
         print(f"No model found, either checkpoint doesn't exist or the model is not passed as the parameter.")
         sys.exit()
     
+    if use_cache:
+        for block in model.blocks:
+            block.sa_heads.reset_cache()
+            
     if prompt is None:
         prompt = input("Please enter the prompt: ")
     input_ids = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=device)
@@ -92,7 +97,7 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=200, use
             temperature=1.0,
             do_sample=True,
             top_p=0.9,
-            repetition_penalty=1.1,
+            repetition_penalty=1.5,
             use_cache=use_cache
         )[0].tolist()
     text = tokenizer.decode(output)
@@ -106,5 +111,5 @@ if __name__ == '__main__':
         use_cache=False
     else:
         use_cache=True
-        
+
     generate(model=model, use_cache=use_cache)
