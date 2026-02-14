@@ -354,7 +354,7 @@ VAL_TOKENS = 5_000_000
 
 Edit hyperparameters in `train.py` at the top of the file:
 
-``python
+```python
 max_iters = 40_000
 warmup_steps = 2_000
 eval_iters = 20
