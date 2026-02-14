@@ -13,6 +13,25 @@ This project addresses the latency bottleneck by implementing a **Speculative De
 
 **Objective:** Increase tokens per second (TPS) by **2x-3x** while guaranteeing mathematically identical output distributions (**lossless quality**) compared to the standard baseline.
 
+## Scope & Intent
+
+This project focuses on evaluating inference speedups from speculative decoding under controlled conditions. It is not designed to achieve state-of-the-art language modeling performance.
+
+Models are intentionally trained at moderate scale to:
+
+- Isolate the inference behaviour
+- Study token acceptance rates and speedup dynamics
+- Benchmark throughput improvements in a reproducible setup
+
+All experiments use **greedy decoding** (argmax selection) for both the baseline and the speculative engine.
+This ensures:
+
+- Deterministic behaviour
+- Direct comparability between the baseline and the speculative engine
+- Strict lossless equivalence in output distribution
+
+The primary objective is systems-level efficiency analysis, not minimizing perplexity or optimizing generative diversity.
+
 ## Plan of Action & Roadmap
 
 ### Phase 1: Training the Models
@@ -171,3 +190,178 @@ Speculative_Decoding_Inference_Engine/
 ├── requirements.txt
 └── train.py
 ```
+
+# Usage
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Prepare your data
+
+```bash
+python data/prepare_data.py
+```
+
+The script will:
+
+- Load the *openwebtext* dataset using Hugging Face `datasets` library
+- Use the pretrained *GPT-2* tokenizer to tokenize the text data
+- Create streaming train and validation data splits
+
+---
+
+## Train the model
+
+```bash
+python train.py --model main
+```
+
+train.py arguments
+
+| Argument | Type | Default | Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--model` | str | `main` | one of {`main`, `draft_small`, `draft_medium`} | Model to train |
+
+The script will:
+
+- Instantiate the model specified by `--model`
+- Save the model configuration to `saved_models/{model_name}_config.json`
+- Resume training from an existing checkpoint (if available)
+- Train for `max_iters` iterations (default: 40,000)
+- Evaluate on train/val splits every `eval_interval` steps (default: 2,000)
+- Save the best model as `saved_models/{model_name}_model.pt`
+- Generate sample text using a predefined prompt every 10,000 steps
+
+---
+
+## Generation Methods
+
+After training, you can generate text using either standard autoregressive decoding or speculative decoding.
+
+### Standard Generation
+
+```bash
+python -m inference.generate --model main --max_new_tokens 512
+```
+
+generate.py arguments
+
+| Argument | Type | Default | Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--model` | str | `main` | one of {`main`, `draft_small`, `draft_medium`} | Model which should be used for generation |
+| `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
+| `--no_cache` | flag | False | present or absent | Disable KV Cache during generation |
+
+The script will:
+
+- Instantiate the model specified by `--model` and load the corresponding saved checkpoint
+- Take prompt as input if not already provided
+- Tokenize the prompt using pretrained *GPT-2* tokenizer
+- Generate `max_new_tokens` number of output tokens
+
+### Speculative Decoding
+
+```bash
+python -m inference.speculative_engine --draft_model draft_medium --gamma 5 --max_new_tokens 512
+```
+
+speculative_engine.py arguments
+
+| Argument | Type | Default | Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`} | Draft model to be used for speculative generation |
+| `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
+| `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
+| `--no_cache` | flag | False | present or absent | Disable KV Cache during generation |
+| `--return_stats` | flag | False | present or absent | Return metrics such as *acceptance_rate*, *mean_accepted* |
+
+The script will:
+
+- Instantiate the main model and the draft model specified by `--draft_model` and load their saved checkpoint
+- Take prompt as input and tokenize it using pretrained *GPT-2* tokenizer
+- Generate `max_new_tokens` tokens by proposing `gamma` tokens wuth the draft model and verifying them with the main model
+- Calculate metrics such as *acceptance_rate*, *mean_accepted* if `--return_stats` flag is provided
+
+---
+
+## Experiments
+
+After training the models, you can perform experiments on them such as evaluating alignment between main model and draft model, performing benchmarks on the inference scripts
+
+### Benchmark Tokens Per Second
+
+```bash
+python -m experiments.benchmark_tps --draft_model draft_medium --gamma 5 --max_new_tokens 512
+```
+
+benchmark_tps.py arguments
+
+| Argument | Type | Default | Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`} | Draft model to be benchmarked |
+| `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
+| `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
+
+The script will:
+
+- Instantiate the main model and the draft model specified by `--draft_model` and load their saved checkpoint
+- Generate `max_new_tokens` number of output tokens to benchmark the models
+- *TPS* will be calculated for the following configurations: 
+   1. main model (with/without cache)
+   2. draft model (with/without cache)
+   3. speculative engine (with/without cache)
+- Calculate speedup (with/without cache) by comparing the *TPS* of main model and speculative engine
+
+### Evaluate alignment
+
+```bash
+python -m experiments.evaluate_alignment --draft_model draft_medium
+```
+
+evaluate_alignment.py arguments
+
+| Argument | Type | Default | Constraints | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`} | Draft model to be used for evaluating alignment with main model |
+
+The script will:
+
+- Instantiate the main model and the draft model specified by `--draft_model` and load their saved checkpoint
+- Sample *n_batches* of *validation* data stream to evaluate the alignment score between the two models
+
+---
+
+## Customization
+
+Edit hyperparameters in `data/data_loader.py` at the top of the file:
+
+```python
+context_length = 1024
+batch_size = 16
+```
+
+Edit hyperparameters in `data/prepare_data.py` at the top of the file:
+
+```python
+TRAIN_TOKENS = 500_000_000
+VAL_TOKENS = 5_000_000
+```
+
+Edit hyperparameters in `train.py` at the top of the file:
+
+``python
+max_iters = 40_000
+warmup_steps = 2_000
+eval_iters = 20
+eval_interval = 2_000
+accumulation_steps = 16
+base_lr = 3e-4
+weight_decay = 0.1
+```
+
+---
