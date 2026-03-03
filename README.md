@@ -165,9 +165,18 @@ Speculative_Decoding_Inference_Engine/
 │   └── prepare_data.py
 │
 ├── experiments/
+│   ├── plots/
+│   │   ├── baseline_tps.pdf
+│   │   ├── gamma_sweep_acceptance.pdf
+│   │   ├── gamma_sweep_speedup.pdf
+│   │   ├── speculative_cache_comparison.pdf
+│   │   └── stress_test.pdf
 │   ├── __init__.py
 │   ├── benchmark_tps.py
-│   └── evaluate_alignment.py
+│   ├── benchmarks.csv
+│   ├── evaluate_alignment.py
+│   ├── plot_graphs.py
+│   └── stress_test.csv
 │
 ├── inference/
 │   ├── __init__.py
@@ -296,26 +305,27 @@ After training the models, you can perform experiments on them such as evaluatin
 ### Benchmark Tokens Per Second
 
 ```bash
-python -m experiments.benchmark_tps --draft_model draft_medium --gamma 5 --max_new_tokens 512
+python -m experiments.benchmark_tps --gamma 5 --max_new_tokens 512
 ```
 
 benchmark_tps.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`} | Draft model to be benchmarked |
 | `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 
 The script will:
 
-- Instantiate the main model and the draft model specified by `--draft_model` and load their saved checkpoint
+- Instantiate the main model and both draft small and draft medium models and load their saved checkpoint
 - Generate `max_new_tokens` number of output tokens to benchmark the models
 - *TPS* will be calculated for the following configurations: 
    1. main model (with/without cache)
    2. draft model (with/without cache)
    3. speculative engine (with/without cache)
 - Calculate speedup (with/without cache) by comparing the *TPS* of main model and speculative engine
+- Perform gamma sweep across various values of gamma and store the results in a dataframe
+- Perform stress test across various context lengths and store the results in a datagrame
 
 ### Evaluate alignment
 
@@ -333,6 +343,17 @@ The script will:
 
 - Instantiate the main model and the draft model specified by `--draft_model` and load their saved checkpoint
 - Sample *n_batches* of *validation* data stream to evaluate the alignment score between the two models
+
+### Plot graphs
+
+```bash
+python -m experiments.plot_graphs
+```
+
+The script will:
+
+- Load dataframes containing the benchmark results
+- Plot different graphs and store them in the `plots/` directory
 
 ---
 
