@@ -1,21 +1,21 @@
-# Accelerating Autoregressive Transformer Inference via Lossless Speculative Decoding
+# Speculative Decoding for Transformer Inference: A Systems Analysis on Memory-Constrained Hardware
 
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/praful-goel/speculative_decoding_models)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Problem Statement
 
-Large Language Models (LLMs) based on the Transformer architecture typically generate tokens in an **auto-regressive manner**, processing one token at a time. This process is highly **memory-bandwidth bound**, as the entire model weights must be loaded from VRAM for every single token generated, leaving GPU compute cores under-utilized.
+Large Language Models (LLMs) based on the Transformer architecture typically generate tokens in an **auto-regressive manner**, processing one token at a time. This process is highly **memory-bandwidth bound**, and requires repeatedly reading model weights from GPU memory for each generated token, leaving GPU compute cores under-utilized.
 
 ## Solution: Speculative Decoding
 
-This project addresses the latency bottleneck by implementing a **Speculative Decoding Inference Engine**. By leveraging a lightweight "Draft Model" to speculatively generate token sequences and a larger "Target Model" to verify them, the system aims to decouple generation speed from model size.
+This project addresses the latency bottleneck by implementing and analyzing a **Speculative Decoding Inference Engine**. By leveraging a lightweight "Draft Model" to speculatively generate token sequences and a larger "Target Model" to verify them, the system aims to decouple generation speed from model size.
 
-**Objective:** Increase tokens per second (TPS) by **2x-3x** while guaranteeing mathematically identical output distributions (**lossless quality**) compared to the standard baseline.
+**Objective:** Evaluate potential TPS speedups (typically **1.2x–3x** depending on alignment and system conditions) while preserving the **exact output distribution** of the baseline autoregressive generation process.
 
 ## Scope & Intent
 
-This project focuses on evaluating inference speedups from speculative decoding under controlled conditions. It is not designed to achieve state-of-the-art language modeling performance.
+This project focuses on **systems-level analysis and benchmarking** of speculative decoding under controlled conditions (varying draft sizes, gamma values and caching strategies). It is not designed to achieve state-of-the-art language modeling performance.
 
 Models are intentionally trained at moderate scale to:
 
