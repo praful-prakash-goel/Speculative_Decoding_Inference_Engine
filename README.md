@@ -1,4 +1,4 @@
-# Speculative Decoding for Transformer Inference: A Systems Analysis on Memory-Constrained Hardware
+# Speculative Decoding for Transformer Inference: Implementation & Systems Analysis on Memory-Constrained Hardware
 
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/praful-goel/speculative_decoding_models)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
