@@ -111,7 +111,7 @@ def plot_graphs():
     sb.lineplot(ax=axes[1], x=gammas, y=df_speculative_small_cache['mean_accepted'], color='steelblue', marker='o', label='Speculative (30M draft)')
     sb.lineplot(ax=axes[1], x=gammas, y=df_speculative_medium_cache['mean_accepted'], color='orange', marker='s', label='Speculative (70M draft)')
 
-    axes[1].set_title("(a) Mean Accepted", fontsize=11)
+    axes[1].set_title("(b) Mean Accepted", fontsize=11)
     axes[1].set_xlabel("\u03B3", fontsize=10)
     axes[1].set_ylabel("Mean Accepted", fontsize=10)
     axes[1].get_legend().remove()
