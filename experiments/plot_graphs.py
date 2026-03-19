@@ -57,7 +57,7 @@ def plot_graphs():
         edgecolor=edge_color,
         linewidth=1.0 
     )
-    ax.set_ylabel('tokens per second', fontsize='12')
+    ax.set_ylabel('Tokens Per Second', fontsize='12')
     ax.set_xlabel('cache', fontsize='15')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=3, frameon=False, fontsize=9)
     plt.tight_layout()
