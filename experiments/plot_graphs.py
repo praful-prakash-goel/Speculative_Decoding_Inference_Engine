@@ -57,7 +57,7 @@ def plot_graphs():
         edgecolor=edge_color,
         linewidth=1.0 
     )
-    ax.set_ylabel('Tokens Per Second', fontsize='12')
+    ax.set_ylabel('Tokens Per Second', fontsize='13')
     ax.set_xlabel('cache', fontsize='15')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=3, frameon=False, fontsize=9)
     plt.tight_layout()
@@ -71,7 +71,7 @@ def plot_graphs():
     sb.lineplot(ax=axes[0], x=gammas, y=df_speculative_medium_no_cache['tps'], color=draft_med_color, marker='s', label='Speculative (70M draft)')
     axes[0].axhline(y=df_baseline['Main'].iloc[0], color=main_color, linestyle='dashed', label='Baseline Main')
 
-    axes[0].set_xlabel('\u03B3', fontsize='15')
+    axes[0].set_xlabel('\u03B3', fontsize='14')
     axes[0].set_ylabel('Tokens Per Second', fontsize='15')
     axes[0].get_legend().remove()
 
@@ -113,7 +113,7 @@ def plot_graphs():
     sb.lineplot(ax=axes[0], x=gammas, y=df_speculative_medium_cache['acceptance'], color=draft_med_color, marker='s', label='Speculative (70M draft)')
 
     axes[0].set_xlabel("\u03B3", fontsize='15')
-    axes[0].set_ylabel("Acceptance Rate", fontsize='15')
+    axes[0].set_ylabel("Acceptance Rate", fontsize='14')
     axes[0].get_legend().remove()
 
     # Right subplot (mean accepted vs gamma)
@@ -121,7 +121,7 @@ def plot_graphs():
     sb.lineplot(ax=axes[1], x=gammas, y=df_speculative_medium_cache['mean_accepted'], color=draft_med_color, marker='s', label='Speculative (70M draft)')
 
     axes[1].set_xlabel("\u03B3", fontsize='15')
-    axes[1].set_ylabel("Mean Accepted", fontsize='15')
+    axes[1].set_ylabel("Mean Accepted", fontsize='14')
     axes[1].get_legend().remove()
 
     # Create shared legend at the top
