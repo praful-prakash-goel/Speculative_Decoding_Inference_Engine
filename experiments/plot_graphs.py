@@ -57,7 +57,8 @@ def plot_graphs():
         edgecolor=edge_color,
         linewidth=1.0 
     )
-    ax.set_ylabel('tokens per second')
+    ax.set_ylabel('tokens per second', fontsize='12')
+    ax.set_xlabel('cache', fontsize='15')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=3, frameon=False, fontsize=9)
     plt.tight_layout()
     fig.savefig(os.path.join(PLOT_DIR, "baseline_tps.pdf"), bbox_inches='tight')
@@ -70,8 +71,8 @@ def plot_graphs():
     sb.lineplot(ax=axes[0], x=gammas, y=df_speculative_medium_no_cache['tps'], color=draft_med_color, marker='s', label='Speculative (70M draft)')
     axes[0].axhline(y=df_baseline['Main'].iloc[0], color=main_color, linestyle='dashed', label='Baseline Main')
 
-    axes[0].set_xlabel('\u03B3', fontsize=10)
-    axes[0].set_ylabel('Tokens Per Second', fontsize=10)
+    axes[0].set_xlabel('\u03B3', fontsize='15')
+    axes[0].set_ylabel('Tokens Per Second', fontsize='15')
     axes[0].get_legend().remove()
 
     # Right subplot (with cache)
@@ -79,8 +80,8 @@ def plot_graphs():
     sb.lineplot(ax=axes[1], x=gammas, y=df_speculative_medium_cache['tps'], color=draft_med_color, marker='s', label='speculative (70M draft)')
     axes[1].axhline(y=df_baseline['Main'].iloc[1], color=main_color, linestyle='dashed', label='Baseline Main')
 
-    axes[1].set_xlabel('\u03B3', fontsize=10)
-    axes[1].set_ylabel("Tokens Per Second", fontsize=10)
+    axes[1].set_xlabel('\u03B3', fontsize='15')
+    axes[1].set_ylabel("Tokens Per Second", fontsize='15')
     axes[1].get_legend().remove()
 
     # Create shared legend at the top
@@ -98,8 +99,8 @@ def plot_graphs():
     sb.lineplot(x=gammas, y=df_speculative_medium_cache['speedup'], color=draft_med_color, marker='s', label='70M - KV Cache', linestyle='dashed')
     sb.lineplot(x=gammas, y=1.0, color=main_color, label='Autoregressive baseline', linestyle='--')
 
-    plt.xlabel("\u03B3")
-    plt.ylabel("Speedup")
+    plt.xlabel("\u03B3", fontsize='15')
+    plt.ylabel("Speedup", fontsize='15')
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.45), ncol=2, frameon=False, fontsize=9)
     plt.tight_layout()
     fig.savefig(os.path.join(PLOT_DIR, "gamma_sweep_speedup.pdf"), bbox_inches='tight')
@@ -111,16 +112,16 @@ def plot_graphs():
     sb.lineplot(ax=axes[0], x=gammas, y=df_speculative_small_cache['acceptance'], color=draft_small_color, marker='o', label='Speculative (30M draft)')
     sb.lineplot(ax=axes[0], x=gammas, y=df_speculative_medium_cache['acceptance'], color=draft_med_color, marker='s', label='Speculative (70M draft)')
 
-    axes[0].set_xlabel("\u03B3", fontsize=10)
-    axes[0].set_ylabel("Acceptance Rate", fontsize=10)
+    axes[0].set_xlabel("\u03B3", fontsize='15')
+    axes[0].set_ylabel("Acceptance Rate", fontsize='15')
     axes[0].get_legend().remove()
 
     # Right subplot (mean accepted vs gamma)
     sb.lineplot(ax=axes[1], x=gammas, y=df_speculative_small_cache['mean_accepted'], color=draft_small_color, marker='o', label='Speculative (30M draft)')
     sb.lineplot(ax=axes[1], x=gammas, y=df_speculative_medium_cache['mean_accepted'], color=draft_med_color, marker='s', label='Speculative (70M draft)')
 
-    axes[1].set_xlabel("\u03B3", fontsize=10)
-    axes[1].set_ylabel("Mean Accepted", fontsize=10)
+    axes[1].set_xlabel("\u03B3", fontsize='15')
+    axes[1].set_ylabel("Mean Accepted", fontsize='15')
     axes[1].get_legend().remove()
 
     # Create shared legend at the top
@@ -135,9 +136,9 @@ def plot_graphs():
     sb.lineplot(x=stress_df.columns, y=stress_df.iloc[1], color=draft_med_color, linestyle='dashed', label='Speculative - KV Cache')
     sb.lineplot(x=stress_df.columns, y=stress_df.iloc[2], color=draft_med_color, label='Speculative - No KV Cache')
 
-    plt.ylabel("Tokens Per Second")
-    plt.xlabel("Max Tokens Generated")
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=3, frameon=False, fontsize=9)
+    plt.ylabel("Tokens Per Second", fontsize='12')
+    plt.xlabel("Max Tokens Generated", fontsize='12')
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=2, frameon=False, fontsize=9)
     plt.tight_layout()
     fig.savefig(os.path.join(PLOT_DIR, "stress_test.pdf"), bbox_inches='tight')
     
