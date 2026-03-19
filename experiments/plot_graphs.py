@@ -96,7 +96,7 @@ def plot_graphs():
     sb.lineplot(x=gammas, y=df_speculative_medium_no_cache['speedup'], color=draft_med_color, marker='s', label='70M - No KV Cache')
     sb.lineplot(x=gammas, y=df_speculative_small_cache['speedup'], color=draft_small_color, marker='o', label='30M - KV Cache', linestyle='dashed')
     sb.lineplot(x=gammas, y=df_speculative_medium_cache['speedup'], color=draft_med_color, marker='s', label='70M - KV Cache', linestyle='dashed')
-    sb.lineplot(x=gammas, y=1.0, color=main_color, label='Baseline Main', linestyle='--')
+    sb.lineplot(x=gammas, y=1.0, color=main_color, label='Autoregressive baseline', linestyle='--')
 
     plt.xlabel("\u03B3")
     plt.ylabel("Speedup")
