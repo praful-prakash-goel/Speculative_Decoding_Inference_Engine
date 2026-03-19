@@ -100,7 +100,7 @@ def plot_graphs():
 
     plt.xlabel("\u03B3")
     plt.ylabel("Speedup")
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.45), ncol=3, frameon=False, fontsize=9)
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.45), ncol=2, frameon=False, fontsize=9)
     plt.tight_layout()
     fig.savefig(os.path.join(PLOT_DIR, "gamma_sweep_speedup.pdf"), bbox_inches='tight')
     
