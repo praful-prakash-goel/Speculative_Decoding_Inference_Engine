@@ -415,17 +415,18 @@ class DecoderModel(nn.Module):
         
     def generate(
         self,
-        idx: torch.LongTensor,
+        input_ids: torch.LongTensor,
         max_new_tokens: int,
         temperature: float = 0.0,
         do_sample: bool = False,
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None,
-        use_cache = True
+        use_cache = True,
+        **kwargs
     ):
         '''
         Args:
-            idx: (B, T_start) initial decoder token ids (prompt)
+            input_ids: (B, T_start) initial decoder token ids (prompt)
             max_new_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature (controls the creativity of the model)
             do_sample: If True sample, else greedy argmax
@@ -436,7 +437,7 @@ class DecoderModel(nn.Module):
         
         if use_cache:
             return self.generate_with_cache(
-                idx=idx,
+                input_ids=input_ids,
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
                 do_sample=do_sample,
@@ -445,7 +446,7 @@ class DecoderModel(nn.Module):
             )
         else:
             return self.generate_without_cache(
-                idx=idx,
+                input_ids=input_ids,
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
                 do_sample=do_sample,
@@ -456,7 +457,7 @@ class DecoderModel(nn.Module):
     @torch.no_grad()
     def generate_without_cache(
         self,
-        idx: torch.LongTensor,
+        input_ids: torch.LongTensor,
         max_new_tokens: int,
         temperature: float = 0.0,
         do_sample: bool = False,
@@ -465,7 +466,7 @@ class DecoderModel(nn.Module):
     ):
         '''
         Args:
-            idx: (B, T_start) initial decoder token ids (prompt)
+            input_ids: (B, T_start) initial decoder token ids (prompt)
             max_new_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature (controls the creativity of the model)
             do_sample: If True sample, else greedy argmax
@@ -476,7 +477,7 @@ class DecoderModel(nn.Module):
         self.eval()
         # Generate Tokens autoregressively
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -self.config.context_length:]
+            idx_cond = input_ids[:, -self.config.context_length:]
             # Generate initial logits
             logits, _ = self(idx_cond)
             # Take only the last logit
@@ -486,7 +487,7 @@ class DecoderModel(nn.Module):
                 last_logits = last_logits / temperature
             
             if repetition_penalty is not None:
-                last_logits = self.apply_repetition_penalty(last_logits, idx, repetition_penalty=repetition_penalty)
+                last_logits = self.apply_repetition_penalty(last_logits, input_ids, repetition_penalty=repetition_penalty)
                 
             if do_sample:
                 if top_p is not None:
@@ -499,14 +500,14 @@ class DecoderModel(nn.Module):
                 # If sampling is not allowed then take the argmax of the logits
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
                 
-            idx = torch.cat([idx, idx_next], dim=1) # (B, T+1)
+            input_ids = torch.cat([input_ids, idx_next], dim=1) # (B, T+1)
         
-        return idx
+        return input_ids
     
     @torch.no_grad()
     def generate_with_cache(
         self,
-        idx: torch.LongTensor,
+        input_ids: torch.LongTensor,
         max_new_tokens: int,
         temperature: float = 0.0,
         do_sample: bool = False,
@@ -515,7 +516,7 @@ class DecoderModel(nn.Module):
     ):
         '''
         Args:
-            idx: Initial decoder token ids (prompt)
+            input_ids: Initial decoder token ids (prompt)
             max_new_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature (Controls the creativity of the model)
             do_sample: If True sample else greedy argmax
@@ -526,14 +527,14 @@ class DecoderModel(nn.Module):
         self.eval()
         
         # Prefill the decoder cache once
-        logits, _ = self(idx, use_cache=True)
+        logits, _ = self(input_ids, use_cache=True)
         last_logits = logits[:, -1, :]
         
         if temperature != 1.0 and temperature > 0.0:
             last_logits = last_logits / temperature
         
         if repetition_penalty is not None:
-            last_logits = self.apply_repetition_penalty(last_logits, idx, repetition_penalty=repetition_penalty)
+            last_logits = self.apply_repetition_penalty(last_logits, input_ids, repetition_penalty=repetition_penalty)
             
         if do_sample:
             if top_p is not None:
@@ -545,11 +546,11 @@ class DecoderModel(nn.Module):
             # If sampling is not allowed then take the argmax of the logits
             idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
         
-        idx = torch.cat([idx, idx_next], dim=1)
+        input_ids = torch.cat([input_ids, idx_next], dim=1)
         
         for _ in range(max_new_tokens - 1):
             # Take only the last token. Position is relative to the cache size
-            last_token = idx[:, -1:]
+            last_token = input_ids[:, -1:]
             
             logits, _ = self(last_token, use_cache=True)
             last_logits = logits[:, -1, :]
@@ -558,7 +559,7 @@ class DecoderModel(nn.Module):
                 last_logits = last_logits / temperature
             
             if repetition_penalty is not None:
-                last_logits = self.apply_repetition_penalty(last_logits, idx, repetition_penalty=repetition_penalty)
+                last_logits = self.apply_repetition_penalty(last_logits, input_ids, repetition_penalty=repetition_penalty)
                 
             if do_sample:
                 if top_p is not None:
@@ -570,9 +571,9 @@ class DecoderModel(nn.Module):
                 # If sampling is not allowed then take the argmax of logits
                 idx_next = torch.argmax(last_logits, dim=-1, keepdim=True)
             
-            idx = torch.cat([idx, idx_next], dim=1)
+            input_ids = torch.cat([input_ids, idx_next], dim=1)
         
-        return idx
+        return input_ids
     
 def build_model(device, config):
     model = DecoderModel(config=config)
