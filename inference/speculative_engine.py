@@ -1,12 +1,14 @@
 import torch
-from .generate import get_model
+from .generate import get_model, reset_cache
 from data.prepare_data import tokenizer
+from transformers import DynamicCache
 import os
 import argparse
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-def generate_speculative(main_model, draft_model, input_ids, max_new_tokens=512, device=DEVICE, gamma=5, use_cache=False, return_stats=False):
+    
+@torch.no_grad()
+def generate_speculative_custom(main_model, draft_model, input_ids, tokenizer, max_new_tokens=512, device=DEVICE, gamma=5, use_cache=False, return_stats=False, **kwargs):
     '''
     Speculative generation function which will utilize draft model to speculate gamma tokens, then verify it with main model in one pass
     
@@ -14,6 +16,7 @@ def generate_speculative(main_model, draft_model, input_ids, max_new_tokens=512,
         main_model: The main model
         draft_model: The draft model
         input_ids: Input sequence of shape: (B, T)
+        tokenizer: Tokenizer to use for the input_ids
         max_new_tokens: Maximum number of tokens to generate
         device: Device to use for generation
         gamma: Number of tokens to speculate using draft model
@@ -106,14 +109,201 @@ def generate_speculative(main_model, draft_model, input_ids, max_new_tokens=512,
         return input_ids, acceptance_rate, mean_accepted
     else:
         return input_ids
+
+@torch.no_grad()
+def generate_speculative_standard(main_model, draft_model, input_ids, tokenizer, attention_mask, max_new_tokens=512, device=DEVICE, gamma=5, use_cache=False, return_stats=False):
+    '''
+    Speculative generation function which will utilize draft model to speculate gamma tokens, then verify it with main model in one pass
+    
+    Args:
+        main_model: The main model
+        draft_model: The draft model
+        input_ids: Input sequence of shape: (B, T)
+        tokenizer: Tokenizer to use for the input_ids
+        attention_mask: Mask for specifying tokens to attend
+        max_new_tokens: Maximum number of tokens to generate
+        device: Device to use for generation
+        gamma: Number of tokens to speculate using draft model
+        use_cache: Boolean variable to determine whether to use cache or not
+        return_stats: Boolean variable to determine whether to return generation stats or not
+    '''
+    
+    # If model is using cache, then reset cache before generation
+    past_key_values = DynamicCache() if use_cache else None
+    generated = []
+    
+    # Pass the input ids once to prefill the decoder cache
+    if use_cache:
+        outputs = draft_model(input_ids, attention_mask=attention_mask, use_cache=True)
+        past_key_values = outputs.past_key_values
+        current_input = input_ids[:, -1:]
+        
+        for _ in range(gamma - 1):
+            outputs = draft_model(
+                current_input,
+                past_key_values=past_key_values,
+                use_cache=True
+            )
+            
+            past_key_values = outputs.past_key_values
+            logits = outputs.logits[:, -1, :]
+            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+            
+            if next_token is not None:
+                generated.append(next_token)
+                current_input = next_token
+            
+            if next_token.item() == tokenizer.eos_token_id:
+                break
+    else:
+        current_input = input_ids
+        
+        for _ in range(gamma):
+            outputs = draft_model(
+                current_input,
+                use_cache=False
+            )
+            
+            logits = outputs.logits[:, -1, :]
+            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+            
+            if next_token is not None:
+                generated.append(next_token)
+                current_input = torch.cat((current_input, next_token), dim=1)
+    
+    if not generated:
+        # If draft failed to speculate even one token, return current input
+        return (input_ids, 0.0, 0.0) if return_stats else input_ids
+    
+    draft_tokens = torch.cat(generated, dim=1)
+    speculated_ids = torch.cat([input_ids, draft_tokens], dim=1)
+    
+    tokens_generated = 0
+    total_accepted_tokens = 0
+    draft_generated_tokens = 0
+    total_steps = 0
+    while tokens_generated < max_new_tokens:
+        input_len = input_ids.shape[1]
+        # Take the new tokens speculated by the draft model
+        draft_tokens = speculated_ids[:, input_len:]
+        
+        # Pass the speculated ids to the main model for verification
+        outputs = main_model(speculated_ids, use_cache=False)
+        target_logits = outputs.logits
+        
+        actual_gamma = draft_tokens.shape[1]
+        # Shift indices by -1 to align the target model's output logits with the draft tokens they are predicting.
+        verification_logits = target_logits[:, input_len - 1 : input_len + actual_gamma - 1, :]
+        main_tokens = torch.argmax(verification_logits, dim=-1)
+        
+        # Calculate the total number of accepted tokens
+        accepted_tokens = 0
+        for i in range(actual_gamma):
+            draft_token = draft_tokens[0, i]
+            main_token = main_tokens[0, i]
+            
+            if draft_token == main_token:
+                accepted_tokens += 1
+            else:
+                break
+        
+        # Take the last correct token predicted by the main model
+        correction_token = torch.argmax(target_logits[:, input_len + accepted_tokens - 1, :], dim=-1)
+        # Valid draft is all the draft tokens which are accepted by the main model
+        valid_draft = draft_tokens[:, :accepted_tokens]
+        
+        # Concatenate the valid draft and correction token to get the new input ids
+        new_tokens = torch.cat([valid_draft, correction_token.unsqueeze(0)], dim=1)
+        input_ids = torch.cat([input_ids, new_tokens], dim=1)
+        attention_mask = torch.ones_like(input_ids)
+        
+        # Increment the counters accordingly
+        tokens_generated += (accepted_tokens + 1)
+        total_accepted_tokens += accepted_tokens
+        draft_generated_tokens += actual_gamma
+        total_steps += 1
+        
+        # If the draft model is using cache, rollback the KV Cache to the actual valid length and speculate the next chunk
+        generated = []
+        if use_cache:
+            # curr_cache_len = past_key_values.get_seq_length()
+            # valid_len = curr_cache_len - (gamma - accepted_tokens)
+            # assert valid_len <= curr_cache_len
+            valid_len = input_len + min(accepted_tokens, gamma - 1)
+            past_key_values.crop(valid_len)
+            
+            if accepted_tokens == gamma:
+                last_token = valid_draft[:, -1:]
+                draft_input = torch.cat([last_token, correction_token.unsqueeze(0)], dim=1)
+            else:
+                draft_input = correction_token.unsqueeze(0)
+            
+            outputs = draft_model(
+                draft_input,
+                past_key_values=past_key_values,
+                use_cache=True
+            )
+            
+            past_key_values = outputs.past_key_values
+            logits = outputs.logits[:, -1, :]
+            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+            
+            generated.append(next_token)
+            current_input = next_token
+            
+            for _ in range(gamma - 1):
+                outputs = draft_model(
+                    current_input,
+                    past_key_values=past_key_values,
+                    use_cache=True
+                )
+                
+                past_key_values = outputs.past_key_values
+                logits = outputs.logits[:, -1, :]
+                next_token = torch.argmax(logits, dim=-1, keepdim=True)
+                
+                generated.append(next_token)
+                current_input = next_token
+        else:
+            current_input = input_ids
+            
+            for _ in range(gamma):
+                outputs = draft_model(
+                    current_input,
+                    use_cache=False
+                )
+                
+                logits = outputs.logits[:, -1, :]
+                next_token = torch.argmax(logits, dim=-1, keepdim=True)
+                generated.append(next_token)
+                
+                current_input = torch.cat((current_input, next_token), dim=1)
+                
+        # Generate the next speculated ids
+        newly_generated_gamma = torch.cat(generated, dim=1)
+        speculated_ids = torch.cat([input_ids, newly_generated_gamma], dim=1)        
+    
+    # Acceptance rate is the total number of tokens accepted divided by total number of tokens generated by the draft model
+    acceptance_rate = total_accepted_tokens / draft_generated_tokens
+    # Mean accepted tokens is the average number of tokens accepted in each step
+    mean_accepted = total_accepted_tokens / total_steps
+    
+    if return_stats:
+        return input_ids, acceptance_rate, mean_accepted
+    else:
+        return input_ids
             
 if __name__ == '__main__':
     # CLI Arguments
     parser = argparse.ArgumentParser("Speculative Inference Engine")
     
     parser.add_argument(
+        "--main_model", type=str, default="main",
+        choices=["main", "gpt2-medium", "opt-350m"], help="Select main model for verification of draft tokens"
+    )
+    parser.add_argument(
         "--draft_model", type=str, default="draft_medium",
-        choices=["draft_small", "draft_medium"], help="Select draft model for speculative generation"
+        choices=["draft_small", "draft_medium", "distilgpt2", "opt-125m"], help="Select draft model for speculative generation"
     )
     parser.add_argument(
         "--gamma", type=int, default=5, help="Number of draft tokens to speculate per step"
@@ -129,6 +319,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     
+    main_model_name = args.main_model
     draft_model_name = args.draft_model
     gamma = args.gamma
     max_new_tokens = args.max_new_tokens
@@ -137,9 +328,9 @@ if __name__ == '__main__':
     
     # Load both models
     print(">> Loading Main Model...")
-    main_model = get_model(model_name="main")
+    main_model, model_tokenizer = get_model(model_name=main_model_name)
     print("\n>> Loading Draft Model...")
-    draft_model = get_model(model_name=draft_model_name)
+    draft_model, _ = get_model(model_name=draft_model_name)
     
     if main_model and draft_model:
         # Put both models in eval model
@@ -148,18 +339,24 @@ if __name__ == '__main__':
         
         # Take the prompt as input and tokenize it
         prompt = input("\nPlease enter the prompt: ")
-        input_ids = torch.tensor(
-            [tokenizer.encode(prompt)],
-            dtype=torch.long,
-            device=DEVICE
-        )
+        
+        inputs = model_tokenizer(prompt, return_tensors="pt")
+        input_ids = inputs.input_ids.to(DEVICE)
+        attention_mask = inputs.attention_mask.to(DEVICE)
         
         if return_stats:
-            output_ids, acceptance_rate, mean_accepted = generate_speculative(main_model, draft_model, input_ids, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
-        else:
-            output_ids = generate_speculative(main_model, draft_model, input_ids, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
+            if main_model_name == 'main' and draft_model_name in ['draft_small', 'draft_medium']:
+                output_ids, acceptance_rate, mean_accepted = generate_speculative_custom(main_model, draft_model, input_ids, model_tokenizer, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
+            else:
+                output_ids, acceptance_rate, mean_accepted = generate_speculative_standard(main_model, draft_model, input_ids, model_tokenizer, attention_mask, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
 
-        text = tokenizer.decode(output_ids[0].tolist())
+        else:
+            if main_model_name == 'main' and draft_model_name in ['draft_small', 'draft_medium']:
+                output_ids = generate_speculative_custom(main_model, draft_model, input_ids, model_tokenizer, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
+            else:
+                output_ids = generate_speculative_standard(main_model, draft_model, input_ids, model_tokenizer, attention_mask, max_new_tokens=max_new_tokens, gamma=gamma, use_cache=use_cache, return_stats=return_stats)
+                
+        text = model_tokenizer.decode(output_ids[0].tolist(), skip_special_tokens=True)
         print(f"\n>> Output: {text}")
         if return_stats:
             print(f"\n>> Acceptance rate: {acceptance_rate*100}%")

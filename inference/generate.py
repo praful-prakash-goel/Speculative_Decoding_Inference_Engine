@@ -3,6 +3,7 @@ import torch
 from model.model_architecture import build_model
 from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_SMALL_CONFIG, DRAFT_MODEL_MEDIUM_CONFIG, ModelConfig
 from data.prepare_data import tokenizer
+from transformers import AutoModelForCausalLM, GPT2TokenizerFast, AutoTokenizer
 import sys
 import argparse
 
@@ -44,28 +45,88 @@ def get_model(model_name, checkpoint_dir=BASE_DIR, device=DEVICE):
         device: Device to use
     '''
     
-    # Construct path dynamically based on the model requested
-    checkpoint_path = os.path.join(checkpoint_dir, f"{model_name}_model.pt")
-    config_path = os.path.join(checkpoint_dir, f"{model_name}_config.json")
-    
-    # Load the checkpoint of the requested model if exist
-    if os.path.exists(checkpoint_path):
-        # Load config
-        config = get_config(model_name, config_path)
+    if model_name in ["main", "draft_small", "draft_medium"]:
+        # Construct path dynamically based on the model requested
+        checkpoint_path = os.path.join(checkpoint_dir, f"{model_name}_model.pt")
+        config_path = os.path.join(checkpoint_dir, f"{model_name}_config.json")
         
-        # Build the model
+        # Load the checkpoint of the requested model if exist
+        if os.path.exists(checkpoint_path):
+            # Load config
+            config = get_config(model_name, config_path)
+            
+            # Build the model
+            print(f">> Building {model_name} model...")
+            model = build_model(device=device, config=config)
+            
+            # Load the checkpoint
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            
+            model_tokenizer = tokenizer
+            model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
+            
+            return model, model_tokenizer
+        else:
+            raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
+    elif model_name == 'gpt2-medium':
         print(f">> Building {model_name} model...")
-        model = build_model(device=device, config=config)
+        model = AutoModelForCausalLM.from_pretrained('openai-community/gpt2-medium').to(device)
+        gpt_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+        gpt_tokenizer.pad_token_id = gpt_tokenizer.eos_token_id
         
-        # Load the checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        return model, gpt_tokenizer
+    elif model_name == 'distilgpt2':
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('distilbert/distilgpt2').to(device)
+        gpt_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+        gpt_tokenizer.pad_token_id = gpt_tokenizer.eos_token_id
         
-        return model
+        return model, gpt_tokenizer
+    elif model_name == 'opt-350m':
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('facebook/opt-350m').to(device)
+        opt_tokenizer = AutoTokenizer.from_pretrained('facebook/opt-350m')
+        opt_tokenizer.pad_token_id = opt_tokenizer.eos_token_id
+        
+        return model, opt_tokenizer
+    elif model_name == 'opt-125m':
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('facebook/opt-125m').to(device)
+        opt_tokenizer = AutoTokenizer.from_pretrained('facebook/opt-350m')
+        opt_tokenizer.pad_token_id = opt_tokenizer.eos_token_id
+        
+        return model, opt_tokenizer
     else:
-        raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
-        
-def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=512, use_cache=True):
+        raise ValueError(f">> Unknown model name: {model_name}. Supported models: 'main', 'draft_small', 'draft_medium', 'distilgpt2', 'gpt2-medium', 'opt-125m' and 'opt-350m'.")
+
+def get_blocks(model):
+    # Custom model architecture
+    if hasattr(model, "blocks"):
+        return model.blocks
+    
+    # GPT-2 family
+    if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
+        return model.transformer.h
+    
+    # Meta OPT family
+    if hasattr(model, "model") and hasattr(model.model, "decoder") and hasattr(model.model.decoder, "layers"):
+        return model.model.decoder.layers
+    
+    raise AttributeError("Model does not have recognizable transformer blocks")
+    
+def reset_cache(model):
+    # custom model
+    if hasattr(model, "blocks"):
+        for block in model.blocks:
+            if hasattr(block, "sa_heads"):
+                block.sa_heads.reset_cache()
+        return None
+
+    # huggingface model
+    return None
+
+def generate(prompt = None, model = None, tokenizer = None, device=DEVICE, max_new_tokens=512, use_cache=True):
     '''
     Generate the output tokens based on the given prompt
     
@@ -81,30 +142,37 @@ def generate(prompt = None, model = None, device=DEVICE, max_new_tokens=512, use
         print(f"No model found, either checkpoint doesn't exist or the model is not passed as the parameter.")
         sys.exit()
     
+    if tokenizer == None:
+        print(f"Please provide an appropriate tokenizer for the model.")
+        sys.exit()
+    
     # If model is using cache, then reset cache before generation
-    if use_cache:
-        for block in model.blocks:
-            block.sa_heads.reset_cache()
+    _ = reset_cache(model)
             
     # Take prompt as input if not already provided
     if prompt is None:
         prompt = input("Please enter the prompt: ")
     # Tokenize the prompt
-    input_ids = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=device)
+    inputs = tokenizer(prompt, return_tensors="pt")
+    
+    input_ids = inputs.input_ids.to(device)
+    attention_mask = inputs.attention_mask.to(device)
     
     # Generate output for the given input ids
     model.eval()
     with torch.no_grad():
         output = model.generate(
-            idx=input_ids,
+            input_ids=input_ids,
             max_new_tokens=max_new_tokens,
             temperature=1.0,
             do_sample=True,
             top_p=0.9,
             repetition_penalty=1.5,
-            use_cache=use_cache
+            use_cache=use_cache,
+            pad_token_id=tokenizer.eos_token_id,
+            attention_mask=attention_mask
         )[0].tolist()
-    text = tokenizer.decode(output)
+    text = tokenizer.decode(output, skip_special_tokens=True)
     
     print(f"\n>> Output: {text}")
     
@@ -114,7 +182,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "--model", type=str, default="main",
-        choices=["main", "draft_small", "draft_medium"], help="Select model to use for generation"
+        choices=["main", "draft_small", "draft_medium", "gpt2-medium", "distilgpt2", "opt-125m", "opt-350m"], help="Select model to use for generation"
     )
     parser.add_argument(
         "--max_new_tokens", type=int, default=512, help="Maximum number of tokens to generate"
@@ -129,5 +197,5 @@ if __name__ == '__main__':
     use_cache = not args.no_cache
     
     # Load the model and generate the output
-    model = get_model(model_name=model_name)
-    generate(model=model, use_cache=use_cache, max_new_tokens=max_new_tokens)
+    model, model_tokenizer = get_model(model_name=model_name)
+    generate(model=model, use_cache=use_cache, max_new_tokens=max_new_tokens, tokenizer=model_tokenizer)
