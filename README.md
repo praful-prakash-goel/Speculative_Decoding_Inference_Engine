@@ -170,7 +170,15 @@ Speculative_Decoding_Inference_Engine/
 │   │   ├── gamma_sweep_acceptance.pdf
 │   │   ├── gamma_sweep_speedup.pdf
 │   │   ├── speculative_cache_comparison.pdf
+│   │   ├── standardized_speedup.pdf
 │   │   └── stress_test.pdf
+│   ├── results/
+│   │   ├── benchmarks_gpt2.csv
+│   │   ├── benchmarks_opt.csv
+│   │   ├── benchmarks.csv
+│   │   ├── stress_test_gpt2.csv
+│   │   ├── stress_test_opt.csv
+│   │   └── stress_test.csv
 │   ├── __init__.py
 │   ├── benchmark_tps.py
 │   ├── benchmarks.csv
@@ -262,7 +270,7 @@ generate.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `--model` | str | `main` | one of {`main`, `draft_small`, `draft_medium`} | Model which should be used for generation |
+| `--model` | str | `main` | one of {`main`, `draft_small`, `draft_medium`, `gpt2-medium`, `distilgpt2`, `opt-125m`, `opt-350m`} | Model which should be used for generation |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 | `--no_cache` | flag | False | present or absent | Disable KV Cache during generation |
 
@@ -276,14 +284,15 @@ The script will:
 ### Speculative Decoding
 
 ```bash
-python -m inference.speculative_engine --draft_model draft_medium --gamma 5 --max_new_tokens 512
+python -m inference.speculative_engine --main_model main --draft_model draft_medium --gamma 5 --max_new_tokens 512
 ```
 
 speculative_engine.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`} | Draft model to be used for speculative generation |
+| `--main_model` | str | `main` | one of {`main`, `gpt2-medium`, `opt-350m`} | Main model to be used for verification of draft tokens |
+| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`, `distilgpt`, `opt-125m`} | Draft model to be used for speculative generation |
 | `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 | `--no_cache` | flag | False | present or absent | Disable KV Cache during generation |
@@ -305,13 +314,14 @@ After training the models, you can perform experiments on them such as evaluatin
 ### Benchmark Tokens Per Second
 
 ```bash
-python -m experiments.benchmark_tps --gamma 5 --max_new_tokens 512
+python -m experiments.benchmark_tps --model custom --gamma 5 --max_new_tokens 512
 ```
 
 benchmark_tps.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
+| `--model` | str | `custom` | one of {`custom`, `gpt2`, `opt`} | Model family to be benchmarked |
 | `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 
