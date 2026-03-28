@@ -153,7 +153,7 @@ if __name__ == '__main__':
             "distilgpt2": get_model(model_name="distilgpt2")
         }
         draft_models['distilgpt2'][0].generation_config.pad_token_id = draft_models['distilgpt2'][0].generation_config.eos_token_id
-        stress_draft_name = "gpt2-medium"
+        stress_draft_name = "distilgpt2"
     
     elif model == "opt":
         SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_opt.csv")
@@ -188,10 +188,6 @@ if __name__ == '__main__':
         reset_draft()
         reset_main()
     
-    d = {'col1': [1, 2], 'col2': [3, 4]}
-    df = pd.DataFrame(data=d)
-    df.to_csv(SAVE_PATH)
-    print("saved")
     if main_model and all(draft_models.values()):
         results = []
         

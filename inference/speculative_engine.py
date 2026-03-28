@@ -138,7 +138,7 @@ def generate_speculative_standard(main_model, draft_model, input_ids, tokenizer,
         past_key_values = outputs.past_key_values
         current_input = input_ids[:, -1:]
         
-        for _ in range(gamma - 1):
+        for _ in range(gamma):
             outputs = draft_model(
                 current_input,
                 past_key_values=past_key_values,
@@ -170,10 +170,6 @@ def generate_speculative_standard(main_model, draft_model, input_ids, tokenizer,
             if next_token is not None:
                 generated.append(next_token)
                 current_input = torch.cat((current_input, next_token), dim=1)
-    
-    if not generated:
-        # If draft failed to speculate even one token, return current input
-        return (input_ids, 0.0, 0.0) if return_stats else input_ids
     
     draft_tokens = torch.cat(generated, dim=1)
     speculated_ids = torch.cat([input_ids, draft_tokens], dim=1)
@@ -226,32 +222,12 @@ def generate_speculative_standard(main_model, draft_model, input_ids, tokenizer,
         # If the draft model is using cache, rollback the KV Cache to the actual valid length and speculate the next chunk
         generated = []
         if use_cache:
-            # curr_cache_len = past_key_values.get_seq_length()
-            # valid_len = curr_cache_len - (gamma - accepted_tokens)
-            # assert valid_len <= curr_cache_len
-            valid_len = input_len + min(accepted_tokens, gamma - 1)
+            valid_len = input_len + accepted_tokens
             past_key_values.crop(valid_len)
             
-            if accepted_tokens == gamma:
-                last_token = valid_draft[:, -1:]
-                draft_input = torch.cat([last_token, correction_token.unsqueeze(0)], dim=1)
-            else:
-                draft_input = correction_token.unsqueeze(0)
+            current_input = correction_token.unsqueeze(0)
             
-            outputs = draft_model(
-                draft_input,
-                past_key_values=past_key_values,
-                use_cache=True
-            )
-            
-            past_key_values = outputs.past_key_values
-            logits = outputs.logits[:, -1, :]
-            next_token = torch.argmax(logits, dim=-1, keepdim=True)
-            
-            generated.append(next_token)
-            current_input = next_token
-            
-            for _ in range(gamma - 1):
+            for _ in range(gamma):
                 outputs = draft_model(
                     current_input,
                     past_key_values=past_key_values,
