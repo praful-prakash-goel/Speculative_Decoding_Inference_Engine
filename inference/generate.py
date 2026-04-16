@@ -3,7 +3,7 @@ import torch
 from model.model_architecture import build_model
 from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_SMALL_CONFIG, DRAFT_MODEL_MEDIUM_CONFIG, ModelConfig
 from data.prepare_data import tokenizer
-from transformers import AutoModelForCausalLM, GPT2TokenizerFast, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import sys
 import argparse
 
@@ -69,36 +69,64 @@ def get_model(model_name, checkpoint_dir=BASE_DIR, device=DEVICE):
             return model, model_tokenizer
         else:
             raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
-    elif model_name == 'gpt2-medium':
+    elif model_name == 'Qwen3-1.7B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('openai-community/gpt2-medium').to(device)
-        gpt_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
-        gpt_tokenizer.pad_token_id = gpt_tokenizer.eos_token_id
+        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen3-1.7B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-1.7B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
-        return model, gpt_tokenizer
-    elif model_name == 'distilgpt2':
+        return model, model_tokenizer
+    elif model_name == 'Qwen3-0.6B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('distilbert/distilgpt2').to(device)
-        gpt_tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
-        gpt_tokenizer.pad_token_id = gpt_tokenizer.eos_token_id
+        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen3-0.6B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-1.7B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
-        return model, gpt_tokenizer
-    elif model_name == 'opt-350m':
+        return model, model_tokenizer
+    elif model_name == 'Qwen2.5-1.5B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('facebook/opt-350m').to(device)
-        opt_tokenizer = AutoTokenizer.from_pretrained('facebook/opt-350m')
-        opt_tokenizer.pad_token_id = opt_tokenizer.eos_token_id
+        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-1.5B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-1.5B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
-        return model, opt_tokenizer
-    elif model_name == 'opt-125m':
+        return model, model_tokenizer
+    elif model_name == 'Qwen2.5-0.5B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('facebook/opt-125m').to(device)
-        opt_tokenizer = AutoTokenizer.from_pretrained('facebook/opt-350m')
-        opt_tokenizer.pad_token_id = opt_tokenizer.eos_token_id
+        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-0.5B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-1.5B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
-        return model, opt_tokenizer
+        return model, model_tokenizer
+    elif model_name == 'SmolLM2-1.7B':
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-1.7B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-1.7B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
+        
+        return model, model_tokenizer
+    elif model_name == 'SmolLM2-360M':
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-360M').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-1.7B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
+        
+        return model, model_tokenizer
+    elif model_name == "Llama-3.2-3B":
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-3.2-3B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-3B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
+        
+        return model, model_tokenizer
+    elif model_name == "Llama-3.2-1B":
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-3.2-1B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-3B')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
+        
+        return model, model_tokenizer
     else:
-        raise ValueError(f">> Unknown model name: {model_name}. Supported models: 'main', 'draft_small', 'draft_medium', 'distilgpt2', 'gpt2-medium', 'opt-125m' and 'opt-350m'.")
+        raise ValueError(f">> Unknown model name: {model_name}.")
 
 def get_blocks(model):
     # Custom model architecture
@@ -182,7 +210,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "--model", type=str, default="main",
-        choices=["main", "draft_small", "draft_medium", "gpt2-medium", "distilgpt2", "opt-125m", "opt-350m"], help="Select model to use for generation"
+        choices=["main", "draft_small", "draft_medium", "Qwen3-1.7B", "Qwen3-0.6B", "Qwen2.5-1.5B", "Qwen2.5-0.5B", "SmolLM2-1.7B", "SmolLM2-360M", "Llama-3.2-3B", "Llama-3.2-1B"], help="Select model to use for generation"
     )
     parser.add_argument(
         "--max_new_tokens", type=int, default=512, help="Maximum number of tokens to generate"

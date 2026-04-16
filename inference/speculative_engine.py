@@ -275,11 +275,11 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "--main_model", type=str, default="main",
-        choices=["main", "gpt2-medium", "opt-350m"], help="Select main model for verification of draft tokens"
+        choices=["main", "Qwen3-1.7B", "Qwen2.5-1.5B", "SmolLM2-1.7B"], help="Select main model for verification of draft tokens"
     )
     parser.add_argument(
         "--draft_model", type=str, default="draft_medium",
-        choices=["draft_small", "draft_medium", "distilgpt2", "opt-125m"], help="Select draft model for speculative generation"
+        choices=["draft_small", "draft_medium", "Qwen3-0.6B", "Qwen2.5-0.5B", "SmolLM2-360M"], help="Select draft model for speculative generation"
     )
     parser.add_argument(
         "--gamma", type=int, default=5, help="Number of draft tokens to speculate per step"
