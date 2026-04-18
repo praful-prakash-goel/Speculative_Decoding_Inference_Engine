@@ -19,6 +19,24 @@ PROMPTS = [
     "The history of the Roman Empire is vast and"
 ]
 
+def fix_pad(model, tokenizer):
+    # Ensure eos token id is int
+    eos_id = model.generation_config.eos_token_id
+    if isinstance(eos_id, list):
+        eos_id = eos_id[0]
+    
+    # Fix tokenizer pad token id    
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    # Ensure pad token id is int
+    if isinstance(tokenizer.pad_token_id, list):
+        tokenizer.pad_token_id = tokenizer.pad_token_id[0]
+    
+    # Set everything
+    model.config.pad_token_id = tokenizer.pad_token_id or eos_id
+    model.generation_config.pad_token_id = model.config.pad_token_id
+    
 def calculate_tps(generate_func, max_new_tokens, use_cache, model_tokenizer, method_name=None, device=DEVICE, prompts=PROMPTS, reset_callback=None, verbose=False):
     '''
     Calculates average tokens per second for the given model
@@ -112,7 +130,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         "--model", type=str, default="custom",
-        choices=["custom", "gpt2", "opt"], help="Model family to perform benchmark"
+        choices=["Custom", "Qwen2.5", "SmolLM", "SmolLM2"], help="Model family to perform benchmark"
     )
     parser.add_argument(
         "--gamma", type=int, default=5, help="Number of draft tokens to speculate per step"
@@ -129,11 +147,11 @@ if __name__ == '__main__':
     print("----- Running the benchmarks -----\n")
     
     # Load the model
-    if model == "custom":
+    if model == "Custom":
         SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks.csv")
         STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test.csv")
         
-        print(">> Loading Custom Models...")
+        print(f">> Loading {model} Models...")
         main_model, main_tokenizer = get_model(model_name="main")
         draft_models = {
             "small": get_model(model_name="draft_small"),
@@ -141,33 +159,51 @@ if __name__ == '__main__':
         }
         stress_draft_name = "medium"
         
-    elif model == "gpt2":
-        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_gpt2.csv")
-        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_gpt2.csv")
+    elif model == "Qwen2.5":
+        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_qwen3.csv")
+        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_qwen3.csv")
         
-        print(">> Loading GPT-2 Models...")
-        main_model, main_tokenizer = get_model(model_name="gpt2-medium")
-        main_model.generation_config.pad_token_id = main_model.generation_config.eos_token_id
+        print(f">> Loading {model} Models...")
+        main_model, main_tokenizer = get_model(model_name="Qwen2.5-1.5B")
+        fix_pad(main_model, main_tokenizer)
         
+        draft_model, draft_tokenizer = get_model(model_name="Qwen2.5-0.5B")
+        fix_pad(draft_model, draft_tokenizer)
         draft_models = {
-            "distilgpt2": get_model(model_name="distilgpt2")
+            "Qwen2.5-0.5B": (draft_model, draft_tokenizer)
         }
-        draft_models['distilgpt2'][0].generation_config.pad_token_id = draft_models['distilgpt2'][0].generation_config.eos_token_id
-        stress_draft_name = "distilgpt2"
+        stress_draft_name = "Qwen2.5-0.5B"
     
-    elif model == "opt":
-        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_opt.csv")
-        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_opt.csv")
+    elif model == "SmolLM":
+        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_smol.csv")
+        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_smol.csv")
         
-        print(">> Loading Meta OPT Models...")
-        main_model, main_tokenizer = get_model(model_name="opt-350m")
-        main_model.generation_config.pad_token_id = main_model.generation_config.eos_token_id
+        print(f">> Loading {model} Modles")
+        main_model, main_tokenizer = get_model(model_name="SmolLM-360M")
+        fix_pad(main_model, main_tokenizer)
         
+        draft_model, draft_tokenizer = get_model(model_name="SmolLM-135M")
+        fix_pad(draft_model, draft_tokenizer)
         draft_models = {
-            "opt-125m": get_model(model_name="opt-125m")
+            "smollm-135M": (draft_model, draft_tokenizer)
         }
-        draft_models['opt-125m'][0].generation_config.pad_token_id = draft_models['opt-125m'][0].generation_config.eos_token_id
-        stress_draft_name = "opt-125m"
+        stress_draft_name = "smollm-135M"
+        
+    elif model == "SmolLM2":
+        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_smol2.csv")
+        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_smol2.csv")
+        
+        print(f">> Loading {model} Modles")
+        main_model, main_tokenizer = get_model(model_name="SmolLM2-360M")
+        fix_pad(main_model, main_tokenizer)
+        
+        draft_model, draft_tokenizer = get_model(model_name="SmolLM2-135M")
+        fix_pad(draft_model, draft_tokenizer)
+        draft_models = {
+            "smollm2-135M": (draft_model, draft_tokenizer)
+        }
+        stress_draft_name = "smollm2-135M"
+        
     else:
         print(f"\n>> Error: Unknown model setup. Supported models: custom, gpt2 and opt")
         exit()
@@ -316,6 +352,10 @@ if __name__ == '__main__':
                     "mean_accepted": mean_accepted_with
                 })
         
+        df = pd.DataFrame(results)
+        df.to_csv(SAVE_PATH)
+        print(f"\n>> Benchmarks result saved at {SAVE_PATH}")
+        
         print(f"\n>> Performing stress test for different context lengths...")
         stress_results = []
         stress_draft = draft_models[stress_draft_name][0]
@@ -361,10 +401,6 @@ if __name__ == '__main__':
                 "tps": tps_speculative_with
             })
             
-        df = pd.DataFrame(results)
-        df.to_csv(SAVE_PATH)
-        print(f"\n>> Benchmarks result saved at {SAVE_PATH}")
-        
         stress_df = pd.DataFrame(stress_results)
         stress_df.to_csv(STRESS_PATH)
         print(f"\n>> Stress Test result saved at {STRESS_PATH}")
