@@ -3,7 +3,7 @@ import torch
 from model.model_architecture import build_model
 from model.config import MAIN_MODEL_CONFIG, DRAFT_MODEL_SMALL_CONFIG, DRAFT_MODEL_MEDIUM_CONFIG, ModelConfig
 from data.prepare_data import tokenizer
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 import sys
 import argparse
 
@@ -69,20 +69,6 @@ def get_model(model_name, checkpoint_dir=BASE_DIR, device=DEVICE):
             return model, model_tokenizer
         else:
             raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
-    elif model_name == 'Qwen3-1.7B':
-        print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen3-1.7B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-1.7B')
-        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
-        
-        return model, model_tokenizer
-    elif model_name == 'Qwen3-0.6B':
-        print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen3-0.6B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen3-1.7B')
-        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
-        
-        return model, model_tokenizer
     elif model_name == 'Qwen2.5-1.5B':
         print(f">> Building {model_name} model...")
         model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-1.5B').to(device)
@@ -97,31 +83,31 @@ def get_model(model_name, checkpoint_dir=BASE_DIR, device=DEVICE):
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
-    elif model_name == 'SmolLM2-1.7B':
+    elif model_name == 'SmolLM-360M':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-1.7B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-1.7B')
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM-360M').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM-360M')
+        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
+        
+        return model, model_tokenizer
+    elif model_name == 'SmolLM-135M':
+        print(f">> Building {model_name} model...")
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM-135M').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM-360M')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
     elif model_name == 'SmolLM2-360M':
         print(f">> Building {model_name} model...")
         model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-360M').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-1.7B')
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-360M')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
-    elif model_name == "Llama-3.2-3B":
+    elif model_name == 'SmolLM2-135M':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-3.2-3B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-3B')
-        model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
-        
-        return model, model_tokenizer
-    elif model_name == "Llama-3.2-1B":
-        print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('meta-llama/Llama-3.2-1B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-3B')
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-135M').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-360M')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
@@ -210,7 +196,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "--model", type=str, default="main",
-        choices=["main", "draft_small", "draft_medium", "Qwen3-1.7B", "Qwen3-0.6B", "Qwen2.5-1.5B", "Qwen2.5-0.5B", "SmolLM2-1.7B", "SmolLM2-360M", "Llama-3.2-3B", "Llama-3.2-1B"], help="Select model to use for generation"
+        choices=["main", "draft_small", "draft_medium", "Qwen2.5-1.5B", "Qwen2.5-0.5B", "SmolLM-360M", "SmolLM-135M", "SmolLM2-360M", "SmolLM2-135M"], help="Select model to use for generation"
     )
     parser.add_argument(
         "--max_new_tokens", type=int, default=512, help="Maximum number of tokens to generate"
