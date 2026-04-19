@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         "--model", type=str, default="custom",
-        choices=["Custom", "Qwen2.5", "SmolLM", "SmolLM2"], help="Model family to perform benchmark"
+        choices=["Custom", "pythia", "SmolLM", "SmolLM2"], help="Model family to perform benchmark"
     )
     parser.add_argument(
         "--gamma", type=int, default=5, help="Number of draft tokens to speculate per step"
@@ -159,27 +159,27 @@ if __name__ == '__main__':
         }
         stress_draft_name = "medium"
         
-    elif model == "Qwen2.5":
-        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_qwen3.csv")
-        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_qwen3.csv")
+    elif model == "pythia":
+        SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_pythia.csv")
+        STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_pythia.csv")
         
         print(f">> Loading {model} Models...")
-        main_model, main_tokenizer = get_model(model_name="Qwen2.5-1.5B")
+        main_model, main_tokenizer = get_model(model_name="pythia-1B")
         fix_pad(main_model, main_tokenizer)
         
-        draft_model, draft_tokenizer = get_model(model_name="Qwen2.5-0.5B")
+        draft_model, draft_tokenizer = get_model(model_name="pythia-160M")
         fix_pad(draft_model, draft_tokenizer)
         draft_models = {
-            "Qwen2.5-0.5B": (draft_model, draft_tokenizer)
+            "pythia-160M": (draft_model, draft_tokenizer)
         }
-        stress_draft_name = "Qwen2.5-0.5B"
+        stress_draft_name = "pythia-160M"
     
     elif model == "SmolLM":
         SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_smol.csv")
         STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_smol.csv")
         
         print(f">> Loading {model} Modles")
-        main_model, main_tokenizer = get_model(model_name="SmolLM-360M")
+        main_model, main_tokenizer = get_model(model_name="SmolLM-1.7B")
         fix_pad(main_model, main_tokenizer)
         
         draft_model, draft_tokenizer = get_model(model_name="SmolLM-135M")
@@ -194,7 +194,7 @@ if __name__ == '__main__':
         STRESS_PATH = os.path.join(RESULTS_DIR, "stress_test_smol2.csv")
         
         print(f">> Loading {model} Modles")
-        main_model, main_tokenizer = get_model(model_name="SmolLM2-360M")
+        main_model, main_tokenizer = get_model(model_name="SmolLM2-1.7B")
         fix_pad(main_model, main_tokenizer)
         
         draft_model, draft_tokenizer = get_model(model_name="SmolLM2-135M")
@@ -360,7 +360,7 @@ if __name__ == '__main__':
         stress_results = []
         stress_draft = draft_models[stress_draft_name][0]
         
-        for context_length in [16, 64, 128, 256, 512]:
+        for context_length in [16, 32, 64, 128, 256]:
             print(f">> Context Length: {context_length}")
             
             tps_main_cache, _, _ = calculate_tps(generate_func=main_model.generate, max_new_tokens=context_length, use_cache=True, model_tokenizer=main_tokenizer, reset_callback=reset_main)

@@ -1,0 +1,16 @@
+,context_length,configuration,tps
+0,16,Main Baseline (With Cache),16.878232219835716
+1,16,Speculative Medium (Without Cache),7.765280414542276
+2,16,Speculative Medium (With Cache),7.758414785815245
+3,32,Main Baseline (With Cache),16.793030136421386
+4,32,Speculative Medium (Without Cache),7.911531072735163
+5,32,Speculative Medium (With Cache),8.577758270837736
+6,64,Main Baseline (With Cache),16.445557415749246
+7,64,Speculative Medium (Without Cache),6.7199740201027955
+8,64,Speculative Medium (With Cache),8.468103059521527
+9,128,Main Baseline (With Cache),15.631332361007319
+10,128,Speculative Medium (Without Cache),5.478250262713684
+11,128,Speculative Medium (With Cache),7.97369472043429
+12,256,Main Baseline (With Cache),7.069239244870239
+13,256,Speculative Medium (Without Cache),3.808414079700569
+14,256,Speculative Medium (With Cache),5.2705610409226065
