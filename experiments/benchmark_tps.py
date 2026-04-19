@@ -157,7 +157,7 @@ if __name__ == '__main__':
             "small": get_model(model_name="draft_small"),
             "medium": get_model(model_name="draft_medium")
         }
-        stress_draft_name = "medium"
+        stress_draft_name = "Medium"
         
     elif model == "pythia":
         SAVE_PATH = os.path.join(RESULTS_DIR, "benchmarks_pythia.csv")
@@ -390,14 +390,14 @@ if __name__ == '__main__':
             tps_speculative_without, _, _ = calculate_tps(generate_func=generate_func, max_new_tokens=context_length, use_cache=False, model_tokenizer=main_tokenizer)
             stress_results.append({
                 "context_length": context_length,
-                "configuration": "Speculative Medium (Without Cache)",
+                "configuration": f"Speculative {stress_draft_name} (Without Cache)",
                 "tps": tps_speculative_without
             })
             
             tps_speculative_with, _, _ = calculate_tps(generate_func=generate_func, max_new_tokens=context_length, use_cache=True, model_tokenizer=main_tokenizer, reset_callback=reset_both)
             stress_results.append({
                 "context_length": context_length,
-                "configuration": "Speculative Medium (With Cache)",
+                "configuration": f"Speculative {stress_draft_name} (With Cache)",
                 "tps": tps_speculative_with
             })
             
