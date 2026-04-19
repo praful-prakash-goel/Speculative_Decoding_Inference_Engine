@@ -152,9 +152,6 @@ def generate_speculative_standard(main_model, draft_model, input_ids, tokenizer,
             if next_token is not None:
                 generated.append(next_token)
                 current_input = next_token
-            
-            if next_token.item() == tokenizer.eos_token_id:
-                break
     else:
         current_input = input_ids
         
@@ -275,11 +272,11 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "--main_model", type=str, default="main",
-        choices=["main", "Qwen2.5-1.5B", "SmolLM-360M", "SmolLM2-360M"], help="Select main model for verification of draft tokens"
+        choices=["main", "pythia-1B", "SmolLM-1.7B", "SmolLM2-1.7B"], help="Select main model for verification of draft tokens"
     )
     parser.add_argument(
         "--draft_model", type=str, default="draft_medium",
-        choices=["draft_small", "draft_medium", "Qwen2.5-0.5B", "SmolLM-135M", "SmolLM2-135M"], help="Select draft model for speculative generation"
+        choices=["draft_small", "draft_medium", "pythia-160M", "SmolLM-135M", "SmolLM2-135M"], help="Select draft model for speculative generation"
     )
     parser.add_argument(
         "--gamma", type=int, default=5, help="Number of draft tokens to speculate per step"

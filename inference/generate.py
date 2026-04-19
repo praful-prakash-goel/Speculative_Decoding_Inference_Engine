@@ -69,45 +69,45 @@ def get_model(model_name, checkpoint_dir=BASE_DIR, device=DEVICE):
             return model, model_tokenizer
         else:
             raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
-    elif model_name == 'Qwen2.5-1.5B':
+    elif model_name == 'pythia-1B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-1.5B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-1.5B')
+        model = AutoModelForCausalLM.from_pretrained('EleutherAI/pythia-1b').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('EleutherAI/pythia-1b')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
-    elif model_name == 'Qwen2.5-0.5B':
+    elif model_name == 'pythia-160M':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-0.5B').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-1.5B')
+        model = AutoModelForCausalLM.from_pretrained('EleutherAI/pythia-160m').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('EleutherAI/pythia-410m')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
-    elif model_name == 'SmolLM-360M':
+    elif model_name == 'SmolLM-1.7B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM-360M').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM-360M')
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM-1.7B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM-1.7B')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
     elif model_name == 'SmolLM-135M':
         print(f">> Building {model_name} model...")
         model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM-135M').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM-360M')
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM-1.7B')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
-    elif model_name == 'SmolLM2-360M':
+    elif model_name == 'SmolLM2-1.7B':
         print(f">> Building {model_name} model...")
-        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-360M').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-360M')
+        model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-1.7B').to(device)
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-1.7B')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
     elif model_name == 'SmolLM2-135M':
         print(f">> Building {model_name} model...")
         model = AutoModelForCausalLM.from_pretrained('HuggingFaceTB/SmolLM2-135M').to(device)
-        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-360M')
+        model_tokenizer = AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-1.7B')
         model_tokenizer.pad_token_id = model_tokenizer.eos_token_id
         
         return model, model_tokenizer
@@ -184,7 +184,8 @@ def generate(prompt = None, model = None, tokenizer = None, device=DEVICE, max_n
             repetition_penalty=1.5,
             use_cache=use_cache,
             pad_token_id=tokenizer.eos_token_id,
-            attention_mask=attention_mask
+            attention_mask=attention_mask,
+            eos_token_id=None
         )[0].tolist()
     text = tokenizer.decode(output, skip_special_tokens=True)
     
@@ -196,7 +197,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "--model", type=str, default="main",
-        choices=["main", "draft_small", "draft_medium", "Qwen2.5-1.5B", "Qwen2.5-0.5B", "SmolLM-360M", "SmolLM-135M", "SmolLM2-360M", "SmolLM2-135M"], help="Select model to use for generation"
+        choices=["main", "draft_small", "draft_medium", "pythia-1B", "pythia-160M", "SmolLM-1.7B", "SmolLM-135M", "SmolLM2-1.7B", "SmolLM2-135M"], help="Select model to use for generation"
     )
     parser.add_argument(
         "--max_new_tokens", type=int, default=512, help="Maximum number of tokens to generate"
