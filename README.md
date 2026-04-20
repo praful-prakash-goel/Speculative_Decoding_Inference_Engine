@@ -170,14 +170,16 @@ Speculative_Decoding_Inference_Engine/
 │   │   ├── gamma_sweep_acceptance.pdf
 │   │   ├── gamma_sweep_speedup.pdf
 │   │   ├── speculative_cache_comparison.pdf
-│   │   ├── standardized_speedup.pdf
+│   │   ├── standardized_models.pdf
 │   │   └── stress_test.pdf
 │   ├── results/
-│   │   ├── benchmarks_gpt2.csv
-│   │   ├── benchmarks_opt.csv
+│   │   ├── benchmarks_pythia.csv
+│   │   ├── benchmarks_smol.csv
+│   │   ├── benchmarks_smol2.csv
 │   │   ├── benchmarks.csv
-│   │   ├── stress_test_gpt2.csv
-│   │   ├── stress_test_opt.csv
+│   │   ├── stress_test_pythia.csv
+│   │   ├── stress_test_smol.csv
+│   │   ├── stress_test_smol2.csv
 │   │   └── stress_test.csv
 │   ├── __init__.py
 │   ├── benchmark_tps.py
@@ -270,7 +272,7 @@ generate.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `--model` | str | `main` | one of {`main`, `draft_small`, `draft_medium`, `gpt2-medium`, `distilgpt2`, `opt-125m`, `opt-350m`} | Model which should be used for generation |
+| `--model` | str | `main` | one of {`main`, `draft_small`, `draft_medium`, `pythia-1B`, `pythia-160M`, `SmolLM-1.7B`, `SmolLM-135M`, `SmolLM2-1.7B`, `SmolLM2-135M`} | Model which should be used for generation |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 | `--no_cache` | flag | False | present or absent | Disable KV Cache during generation |
 
@@ -291,8 +293,8 @@ speculative_engine.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `--main_model` | str | `main` | one of {`main`, `gpt2-medium`, `opt-350m`} | Main model to be used for verification of draft tokens |
-| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`, `distilgpt`, `opt-125m`} | Draft model to be used for speculative generation |
+| `--main_model` | str | `main` | one of {`main`, `pythia-1B`, `SmolLM-1.7B`, `SmolLM2-1.7B`} | Main model to be used for verification of draft tokens |
+| `--draft_model` | str | `draft_medium` | one of {`draft_small`, `draft_medium`, `pythia-160M`, `SmolLM-135M`, `SmolLM2-135M`} | Draft model to be used for speculative generation |
 | `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 | `--no_cache` | flag | False | present or absent | Disable KV Cache during generation |
@@ -321,7 +323,7 @@ benchmark_tps.py arguments
 
 | Argument | Type | Default | Constraints | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `--model` | str | `custom` | one of {`custom`, `gpt2`, `opt`} | Model family to be benchmarked |
+| `--model` | str | `custom` | one of {`custom`, `pythia`, `SmolLM`, `SmolLM2`} | Model family to be benchmarked |
 | `--gamma` | int | 5 | > 0 | Number of draft tokens to speculate per step |
 | `--max_new_tokens` | int | 512 | > 0 | Maximum number of tokens to generate |
 
